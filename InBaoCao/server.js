@@ -3,52 +3,13 @@ import multer from "multer";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { convertWord } from "./word-converter.js";
 const app = express();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024, files: 1 },
 });
 let converting = false;
-function convert(dir, input) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      process.env.SOFFICE_BIN || "soffice",
-      [
-        "-env:UserInstallation=file://" + dir + "/profile",
-        "--headless",
-        "--convert-to",
-        "pdf",
-        "--outdir",
-        dir,
-        input,
-      ],
-      { stdio: "ignore" },
-    );
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(
-        Error("Chuyển Word quá thời gian. Hãy xuất PDF từ Word rồi nhập lại."),
-      );
-    }, 90000);
-    child.on("error", () => {
-      clearTimeout(timer);
-      reject(
-        Error(
-          "Máy chủ chưa có LibreOffice. Hãy xuất Word thành PDF rồi nhập lại.",
-        ),
-      );
-    });
-    child.on("exit", (code) => {
-      clearTimeout(timer);
-      code === 0
-        ? resolve()
-        : reject(
-            Error("Không chuyển được Word. Hãy xuất PDF từ Word rồi nhập lại."),
-          );
-    });
-  });
-}
 app.post("/api/convert-docx", upload.single("file"), async (req, res) => {
   let dir;
   if (converting)
@@ -63,7 +24,7 @@ app.post("/api/convert-docx", upload.single("file"), async (req, res) => {
     const { writeFile } = await import("node:fs/promises");
     const input = path.join(dir, "template.docx");
     await writeFile(input, req.file.buffer);
-    await convert(dir, input);
+    await convertWord(dir, input);
     const pdf = await readFile(path.join(dir, "template.pdf"));
     res.type("application/pdf").send(pdf);
   } catch (e) {
@@ -74,14 +35,12 @@ app.post("/api/convert-docx", upload.single("file"), async (req, res) => {
   }
 });
 app.use((error, req, res, next) => {
-  res
-    .status(400)
-    .json({
-      error:
-        error.code === "LIMIT_FILE_SIZE"
-          ? "Mẫu tối đa 25 MB."
-          : "Không đọc được tệp gửi lên.",
-    });
+  res.status(400).json({
+    error:
+      error.code === "LIMIT_FILE_SIZE"
+        ? "Mẫu tối đa 25 MB."
+        : "Không đọc được tệp gửi lên.",
+  });
 });
 if (process.argv.includes("--dev")) {
   const { createServer } = await import("vite");

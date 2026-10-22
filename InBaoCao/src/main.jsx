@@ -1303,7 +1303,7 @@ function App() {
           )}
           <footer className="bottom-note">
             <ShieldCheck size={15} /> Không lưu danh sách người khám lên máy chủ
-            · InBaoCao v1.0
+            · InBaoCao v1.1
           </footer>
         </div>
       </main>

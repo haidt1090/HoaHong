@@ -4,3 +4,5 @@ playwright-report/
 test-results/
 *.log
 .npm-cache/
+release/
+.desktop-package/

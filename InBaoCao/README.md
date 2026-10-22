@@ -2,6 +2,10 @@
 
 Ứng dụng tiếng Việt nhập danh sách Excel, liên kết dữ liệu với nhiều mẫu sổ khám sức khỏe và xuất PDF A3 hàng loạt. Yêu cầu gốc và phạm vi triển khai: [docs/YEU_CAU.md](docs/YEU_CAU.md).
 
+## Bản Windows EXE
+
+Xem [hướng dẫn dùng, chuyển máy và đóng gói Windows](docs/UNG_DUNG_WINDOWS.md). Có bộ cài và bản portable; máy sử dụng không cần Node.js. Chỉnh mã nguồn rồi chạy `DongGoiWindows.cmd` để tạo phiên bản mới.
+
 ## Chạy ứng dụng
 
 Yêu cầu Node.js 22.13+ hoặc 24, npm. LibreOffice (`soffice` trong PATH) cần cho nhập `.docx`; có thể đặt `SOFFICE_BIN` là đường dẫn executable. Không cần cơ sở dữ liệu hoặc API key. Mặc định cổng 5173; đổi bằng `PORT`.

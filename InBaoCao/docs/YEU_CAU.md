@@ -47,3 +47,14 @@ Các file chỉ được dùng tham khảo và kiểm thử cục bộ. Không �
 - File `.xls` đời cũ cần lưu lại thành `.xlsx`.
 - Mã vạch sẵn có trong mẫu là nội dung nền, chưa tự sinh mã vạch mới. Cần mẫu trắng không có dữ liệu cá nhân cũ trước khi sử dụng chính thức. Nền trắng chỉ che trực quan, không phải công cụ xóa dữ liệu bảo mật khỏi PDF.
 - Mẫu minh họa đi kèm không thay thế mẫu khám theo quy định chuyên môn.
+
+## Bổ sung: ứng dụng Windows và đóng gói lại
+
+Người dùng yêu cầu chuyển sang file `.exe` để sử dụng, chỉnh sửa và mang sang máy khác.
+
+- Có cửa sổ desktop riêng bằng Electron, bộ cài Windows và bản portable cho Windows 10/11 x64.
+- Máy sử dụng không cần Node.js. Font và giao diện có sẵn trong gói, xử lý Excel/PDF ngoại tuyến.
+- Giữ chức năng chỉnh mẫu, sao lưu/khôi phục kho mẫu để chuyển máy. Không cần build lại chỉ để sửa mẫu.
+- Giữ mã nguồn trong repo HoaHong; có script `DongGoiWindows.cmd` và GitHub Actions để build các phiên bản sau. Máy sửa mã nguồn/build cần Node.js và Internet tải công cụ.
+- Kho mẫu desktop lưu riêng tại AppData của từng tài khoản Windows. Bộ cài không nhúng dữ liệu người khám hoặc kho mẫu cá nhân.
+- Nhập Word trực tiếp vẫn cần LibreOffice trên máy sử dụng; có thể dùng mẫu PDF thay thế.
