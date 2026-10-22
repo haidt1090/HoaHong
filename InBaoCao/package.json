@@ -82,7 +82,11 @@
       "createStartMenuShortcut": true,
       "shortcutName": "InBaoCao",
       "deleteAppDataOnUninstall": false,
-      "script": "build/installer.nsi"
+      "script": "build/installer.nsi",
+      "installerLanguages": [
+        "vi_VN"
+      ],
+      "language": "1066"
     },
     "portable": {
       "artifactName": "InBaoCao-${version}-x64-Portable.exe"
