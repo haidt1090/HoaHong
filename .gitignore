@@ -1,8 +1,9 @@
-node_modules/
+.venv/
+__pycache__/
+*.py[cod]
+build/
 dist/
-playwright-report/
-test-results/
 *.log
-.npm-cache/
-release/
-.desktop-package/
+.pytest_cache/
+Thumbs.db
+Desktop.ini

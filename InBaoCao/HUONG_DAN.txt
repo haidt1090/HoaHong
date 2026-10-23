@@ -1,0 +1,86 @@
+INBAOCAO PYTHON 2.0 — WORD KEYWORD + EXCEL + IN HÀNG LOẠT
+
+1. CÀI VÀ CHẠY MÃ NGUỒN
+- Giải nén toàn bộ ZIP vào một thư mục, không chỉ lấy riêng app.py.
+- Máy chạy source/build: cài Python 3.12 64-bit từ python.org, có pip và Tcl/Tk.
+- Bấm CaiDat.cmd một lần (cần Internet để tải thư viện).
+- Bấm CHAY_PHAN_MEM.bat để mở ứng dụng. Không cần npm/Node.js.
+- Máy in trực tiếp cần Microsoft Word desktop đã cài, mở dùng được bình thường.
+  Không cần LibreOffice. Word Online không dùng được để in trực tiếp.
+
+2. CHUẨN BỊ MẪU WORD
+- Mở MAU_WORD_KEYWORD.docx để xem ví dụ. Đây là mẫu minh họa, không phải mẫu y tế chính thức.
+- Với mẫu thật, giữ bố cục/khổ A3/hướng giấy của bạn, chỉ thay thông tin cần điền bằng keyword.
+- Ví dụ: Họ và tên: $hovaten     Giới tính: $gt     Sinh ngày: $ngaysinh
+- Keyword không cần nằm trong một kiểu chữ duy nhất, có thể dùng nhiều lần,
+  trong bảng, đầu trang, cuối trang và hộp văn bản thông thường.
+- Lưu Word dưới dạng .docx. Mẫu .doc cần Save As thành .docx trước.
+- Xóa thông tin người cũ, chữ ký và mã vạch cũ trước khi làm mẫu dùng chung.
+
+KEYWORD GỢI Ý
+$so             STT / Số
+$hovaten        Họ tên / HỌ VÀ TÊN
+$gt             Giới tính
+$manv           Mã NV / Mã nhân viên
+$ngaysinh       NGÀY SINH
+$cccd           CCCD / Số CCCD
+$ngaycap        Ngày cấp CCCD / Ngày cấp
+$noicap         Nơi cấp CCCD / Nơi cấp
+$dantoc         Dân tộc
+$noiohientai    Nơi ở hiện tại
+$nghenghiep     Nghề nghiệp
+$noicongtac     Nơi công tác, học tập / Công ty / Đơn vị
+$doituong       Đối tượng
+$nguonchitra    Nguồn chi trả
+$nhommau        Nhóm máu
+$lydokham       Lý do khám
+$sdt            Số điện thoại
+$bophan         Bộ phận
+$chucvu         Chức vụ
+
+Có thể tự tạo $makham hoặc ${Tên cột có dấu và khoảng trắng}.
+Các keyword tự tạo xuất hiện trong bảng liên kết, không cần sửa code.
+Không phân biệt hoa/thường, dấu tiếng Việt và (*) khi tự ghép cột.
+Dữ liệu thiếu/keyword không có liên kết để trống, không bắt buộc cột nào.
+Không tự coi Địa chỉ thường trú là Nơi ở hiện tại hoặc Bộ phận là Nghề nghiệp.
+
+3. DÙNG ỨNG DỤNG
+- Nhập mẫu Word, đặt tên. Mẫu được sao chép vào kho riêng, không sửa file gốc.
+- Chọn Excel .xlsx; kiểm tra trang tính và dòng tiêu đề (ứng dụng tự tìm trong 40 dòng đầu).
+- Mở tab Liên kết keyword với cột Excel, chọn lại cột nếu cần.
+- Không có cột: chọn để trống hoặc điền Giá trị chung (ví dụ tên công ty).
+- Bấm Lưu liên kết để dùng cho các lần sau.
+- Bấm chọn một dòng rồi Xem thử 1 người: mở đúng một bản Word đã điền.
+- Muốn in ngay: chọn máy in thực tế, chọn các người cần in, bấm IN HÀNG LOẠT.
+  Không bắt buộc xem thử và không hiện review từng sổ. Mỗi người là một lệnh in.
+- Mẫu Word quyết định cỡ giấy A3 và hướng giấy; ứng dụng không đổi thiết lập mặc định của máy in.
+- Máy in ảo PDF/XPS có thể hỏi tên file cho từng người. Chọn máy in A3 thực để in liên tục.
+- Dừng sau sổ hiện tại chỉ ngăn những sổ chưa gửi, không hủy lệnh đã vào hàng đợi.
+- Xuất Word đã chọn: lưu các bản .docx vào một thư mục mới, không cần Word/ máy in.
+
+4. ĐÓNG GÓI EXE TRÊN WINDOWS
+- Bấm DONG_GOI_EXE.bat. Lần đầu cần Internet cài PyInstaller.
+- Chờ hiện "Da dong goi thanh cong" rồi mở dist\InBaoCao.exe.
+- Không chạy hay chép EXE trong lúc đang build. Nếu build lỗi, không dùng EXE còn sót lại.
+- Máy nhận EXE không cần Python, Node hay pip; in trực tiếp vẫn cần Microsoft Word và driver máy in.
+- Chưa có chữ ký số nhà phát hành. Không tắt phần mềm bảo vệ để mở ứng dụng.
+
+5. MANG MẪU SANG MÁY KHÁC
+- Trong app, Sao lưu kho mẫu để lấy ZIP chứa mẫu Word và liên kết.
+- Chép EXE và ZIP kho mẫu sang máy mới, mở app và chọn Khôi phục ZIP.
+- Excel danh sách chọn lại mỗi đợt, không lưu vào kho mẫu.
+- Kho dữ liệu Windows: %APPDATA%\InBaoCaoPython.
+- Bản xem thử là file tạm, được dọn khi đóng app nếu Word không còn giữ file.
+- Kho mẫu JSON/PDF của bản Electron cũ không tự chuyển thành mẫu Word keyword.
+
+6. CHỈNH CODE
+app.py                  Điểm mở ứng dụng
+inbaocao/gui.py         Giao diện, chọn danh sách, nút xem/in
+inbaocao/core.py        Đọc Excel, keyword, trộn Word giữ định dạng
+inbaocao/printing.py    In trực tiếp bằng Microsoft Word trên Windows
+inbaocao/storage.py     Kho mẫu, lưu liên kết, ZIP sao lưu
+InBaoCao.spec           Cấu hình đóng gói PyInstaller một file EXE
+
+KIỂM THỬ: python -m unittest discover -s tests -v
+Bản này đã kiểm tra logic và giao diện tại môi trường phát triển;
+chưa xác minh in A3 vật lý hay chạy Word automation trên Windows thật.

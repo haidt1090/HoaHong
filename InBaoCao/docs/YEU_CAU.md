@@ -58,3 +58,13 @@ Người dùng yêu cầu chuyển sang file `.exe` để sử dụng, chỉnh s
 - Giữ mã nguồn trong repo HoaHong; có script `DongGoiWindows.cmd` và GitHub Actions để build các phiên bản sau. Máy sửa mã nguồn/build cần Node.js và Internet tải công cụ.
 - Kho mẫu desktop lưu riêng tại AppData của từng tài khoản Windows. Bộ cài không nhúng dữ liệu người khám hoặc kho mẫu cá nhân.
 - Nhập Word trực tiếp vẫn cần LibreOffice trên máy sử dụng; có thể dùng mẫu PDF thay thế.
+
+## Yêu cầu thay thế ngày 23/10/2026: Python + Word keyword
+
+- Chuyển bản đang phát triển sang Python, giảm phụ thuộc và không dùng Electron/npm.
+- Mẫu đầu vào là Word `.docx`, liên kết bằng keyword như `$hovaten`, `$gt` theo ảnh người dùng; không còn đặt tọa độ lên PDF.
+- Chỉ cần xem một người, không bắt buộc xem thử trước khi in hàng loạt.
+- In những người được chọn trực tiếp qua Word desktop trên Windows, không review từng bản; giữ khổ A3/bố cục mẫu.
+- Cho phép keyword riêng, tự nhận diện cột và chỉnh liên kết, giá trị thiếu để trống.
+- Giao source ZIP theo dạng người dùng đã quen: app.py, .spec, CHAY_PHAN_MEM.bat, DONG_GOI_EXE.bat, requirements.txt, HUONG_DAN.txt, Excel mẫu; bổ sung Word mẫu keyword và modules Python.
+- Không gửi dữ liệu người khám trong ZIP. Bản Electron cũ đã được xóa theo yêu cầu dọn sạch của người dùng. Bản Python được phép đẩy lên GitHub để tải source mới.
