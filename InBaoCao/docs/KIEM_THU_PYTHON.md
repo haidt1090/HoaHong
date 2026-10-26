@@ -26,3 +26,5 @@
 
 
 Sửa lỗi kết nối Word: bỏ qua wrapper COM sinh sẵn, báo rõ bước lỗi và giữ nguyên lỗi gốc nếu đóng Word thất bại. Đếm sổ ngay sau PrintOut thành công để tránh in trùng khi đóng tài liệu lỗi. Kiểm tra tự động: 14 bài đạt, 4 bài GUI bỏ qua; chưa xác minh in thực tế trên Windows.
+
+Sửa bước chọn máy in: đánh dấu FilePrintSetup là phương thức COM bằng _FlagAsMethod trước khi gọi, vì WordBasic thiếu metadata có thể khiến pywin32 đọc thành thuộc tính None. Bài kiểm tra mô phỏng FilePrintSetup ban đầu là None và chỉ gọi được sau khi đánh dấu; 14 bài đạt, 4 bài GUI bỏ qua. Cần xác minh tiếp trên Word Windows thực tế.

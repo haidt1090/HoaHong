@@ -91,7 +91,13 @@ def print_batch(
         )
         if printer:
             stage = f"chọn máy in {printer}"
-            word.WordBasic.FilePrintSetup(Printer=printer, DoNotSetAsSysDefault=1)
+            word_basic = word.WordBasic
+            # WordBasic exposes legacy macro commands without reliable type info.
+            # pywin32 otherwise reads FilePrintSetup as a property, returning None.
+            flag_method = getattr(word_basic, "_FlagAsMethod", None)
+            if callable(flag_method):
+                flag_method("FilePrintSetup")
+            word_basic.FilePrintSetup(Printer=printer, DoNotSetAsSysDefault=1)
         with TemporaryDirectory(prefix="inbaocao-print-") as work:
             for index, row in enumerate(rows):
                 if cancel.is_set():

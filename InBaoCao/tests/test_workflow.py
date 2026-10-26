@@ -174,8 +174,15 @@ class WorkflowTests(unittest.TestCase):
                 self.Documents = Documents()
                 self.quit = False
                 self.WordBasic = self
+                # Reproduce WordBasic's missing method metadata on Windows.
+                self.FilePrintSetup = None
+                self.flagged = []
 
-            def FilePrintSetup(self, **kwargs):
+            def _FlagAsMethod(self, name):
+                self.flagged.append(name)
+                self.FilePrintSetup = self.setup_printer
+
+            def setup_printer(self, **kwargs):
                 self.printer = kwargs
 
             def Quit(self, **kwargs):
@@ -199,6 +206,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(progress, [(1, 2), (2, 2)])
         self.assertTrue(word.quit)
         self.assertFalse(word.Visible)
+        self.assertEqual(word.flagged, ["FilePrintSetup"])
         self.assertEqual(word.printer["DoNotSetAsSysDefault"], 1)
         for doc in word.Documents.docs:
             self.assertEqual(
