@@ -23,3 +23,6 @@
 - Vùng in cố định ngoài vùng nội dung co giãn; bảng lớn không đẩy hàng nút khỏi cửa sổ. Hàng nút tự xuống hai dòng khi tổng chiều rộng yêu cầu vượt phần hiển thị.
 - 4 kiểm thử GUI thực trên Linux/Xvfb: 9 tổ hợp kích thước/DPI, vùng nhập liệu cao bất thường, nút quá rộng và trạng thái chọn người/tiến độ/dừng/hoàn tất. Không gửi lệnh tới máy in thật.
 - Chạy cùng 13 bài logic bằng `INBAOCAO_GUI_TESTS=1`: tổng 17 bài. Nếu không bật biến này, 4 bài GUI được bỏ qua có chủ ý. Chưa xác minh bố cục bản sửa trên Windows thật.
+
+
+Sửa lỗi kết nối Word: bỏ qua wrapper COM sinh sẵn, báo rõ bước lỗi và giữ nguyên lỗi gốc nếu đóng Word thất bại. Đếm sổ ngay sau PrintOut thành công để tránh in trùng khi đóng tài liệu lỗi. Kiểm tra tự động: 14 bài đạt, 4 bài GUI bỏ qua; chưa xác minh in thực tế trên Windows.

@@ -264,6 +264,20 @@ class WorkflowTests(unittest.TestCase):
             )
         self.assertTrue(broken.quit)
 
+    def test_print_error_identifies_stage_and_preserves_original_error(self):
+        class Word:
+            WordBasic = None
+
+            def Quit(self, **kwargs):
+                raise RuntimeError("cleanup failed")
+
+        with self.assertRaisesRegex(RuntimeError, "chọn máy in Máy A3") as caught:
+            print_batch(
+                self.template, [], [{}], {}, {}, "Máy A3",
+                threading.Event(), lambda *_: None, dispatch=lambda _: Word(),
+            )
+        self.assertNotIn("cleanup failed", str(caught.exception))
+
     def test_restore_does_not_extract_paths_outside_store(self):
         backup = self.root / "bad.zip"
         with ZipFile(backup, "w") as archive:

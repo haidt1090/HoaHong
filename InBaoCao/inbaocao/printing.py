@@ -63,14 +63,19 @@ def print_batch(
         try:
             import pythoncom
             from win32com.client import DispatchEx
+            from win32com.client.dynamic import DumbDispatch
         except ImportError as exc:
             raise RuntimeError(
                 "Thiếu pywin32. Chạy lại CaiDat.cmd trên máy phát triển."
             ) from exc
         pythoncom.CoInitialize()
-        dispatch = DispatchEx
+        # Bypass stale/generated makepy wrappers on the user machine.
+        def dispatch(name):
+            return DumbDispatch(DispatchEx(name)._oleobj_)
     word = None
     submitted = 0
+    stage = "khởi động Microsoft Word"
+    failed = False
     try:
         try:
             word = dispatch("Word.Application")
@@ -78,41 +83,59 @@ def print_batch(
             raise RuntimeError(
                 "Không mở được Microsoft Word. Cần cài và mở Word desktop một lần trước khi in; Word Online không hỗ trợ in trực tiếp."
             ) from exc
+        stage = "thiết lập Microsoft Word"
         word.Visible = False
         word.DisplayAlerts = 0
         word.AutomationSecurity = (
             3  # Disable macros in the isolated automation instance.
         )
         if printer:
+            stage = f"chọn máy in {printer}"
             word.WordBasic.FilePrintSetup(Printer=printer, DoNotSetAsSysDefault=1)
         with TemporaryDirectory(prefix="inbaocao-print-") as work:
             for index, row in enumerate(rows):
                 if cancel.is_set():
                     break
                 target = Path(work) / f"{index+1:06d}.docx"
+                stage = f"điền mẫu cho người thứ {index + 1}"
                 merge_docx(
                     template_file, target, row_values(tokens, row, mapping, constants)
                 )
                 document = None
                 try:
+                    stage = f"mở sổ người thứ {index + 1} trong Word"
                     document = word.Documents.Open(
                         str(target.resolve()),
                         ReadOnly=True,
                         AddToRecentFiles=False,
                         ConfirmConversions=False,
                     )
+                    stage = f"gửi lệnh in người thứ {index + 1}"
                     document.PrintOut(Background=False, Copies=1)
+                    submitted += 1
+                    progress(submitted, len(rows))
+                    stage = f"đóng sổ người thứ {index + 1}"
                 finally:
                     if document is not None:
-                        document.Close(SaveChanges=0)
-                submitted += 1
-                progress(submitted, len(rows))
+                        original_error = sys.exc_info()[0] is not None
+                        try:
+                            document.Close(SaveChanges=0)
+                        except Exception:
+                            if not original_error:
+                                raise
                 target.unlink(missing_ok=True)
         return submitted
+    except Exception as exc:
+        failed = True
+        raise RuntimeError(f"Lỗi tại bước {stage}: {exc}") from exc
     finally:
         try:
             if word is not None:
-                word.Quit(SaveChanges=0)
+                try:
+                    word.Quit(SaveChanges=0)
+                except Exception:
+                    if not failed:
+                        raise
         finally:
             if pythoncom is not None:
                 pythoncom.CoUninitialize()
