@@ -2,11 +2,19 @@ INBAOCAO PYTHON 2.0 — WORD KEYWORD + EXCEL + IN HÀNG LOẠT
 
 1. CÀI VÀ CHẠY MÃ NGUỒN
 - Giải nén toàn bộ ZIP vào một thư mục, không chỉ lấy riêng app.py.
-- Máy chạy source/build: cài Python 3.12 64-bit từ python.org, có pip và Tcl/Tk.
-- Bấm CaiDat.cmd một lần (cần Internet để tải thư viện).
+- Máy chạy source/build: cài Python 3.10–3.15 64-bit từ python.org, có pip và Tcl/Tk.
+- Bấm CaiDat.cmd một lần (cần Internet để tải thư viện). Bộ cài tự dùng Python hiện có.
 - Bấm CHAY_PHAN_MEM.bat để mở ứng dụng. Không cần npm/Node.js.
 - Máy in trực tiếp cần Microsoft Word desktop đã cài, mở dùng được bình thường.
   Không cần LibreOffice. Word Online không dùng được để in trực tiếp.
+
+NẾU MÁY ĐÃ CÓ PYTHON 3.15
+- Không cần cài thêm Python 3.12. Bộ cài tự dùng python hoặc py đang có.
+- Nếu đang ở dấu >>>, gõ exit() để trở về Command Prompt.
+- Python 3.15 cần pywin32 312 và PyInstaller 6.22.3 theo requirements mới.
+- Ba file cài/chạy/build dùng chung bộ chọn môi trường. Nếu đã có .venv315, ứng dụng nhận lại.
+- Môi trường .venv hỏng được đổi tên thành .venv-backup-... và giữ nguyên trước khi tạo mới.
+- Bộ cài không gỡ/đổi Python hệ thống, không xóa mẫu Word hoặc danh sách Excel.
 
 2. CHUẨN BỊ MẪU WORD
 - Mở MAU_WORD_KEYWORD.docx để xem ví dụ. Đây là mẫu minh họa, không phải mẫu y tế chính thức.

@@ -6,10 +6,10 @@
 
 ## Chạy và đóng gói trên Windows
 
-Cài Python **3.12 64-bit** kèm Tcl/Tk và pip. Chạy `CaiDat.cmd` một lần rồi `CHAY_PHAN_MEM.bat`. Để tạo EXE, chạy `DONG_GOI_EXE.bat`, kết quả **`dist/InBaoCao.exe`**. Máy nhận EXE không cần Python. Chưa đo kích thước/tốc độ build Windows thực tế, không cam kết số MB hoặc thời gian cụ thể.
+Cài Python **3.10–3.15 64-bit** kèm Tcl/Tk và pip. Chạy `CaiDat.cmd` một lần rồi `CHAY_PHAN_MEM.bat`. Để tạo EXE, chạy `DONG_GOI_EXE.bat`, kết quả **`dist/InBaoCao.exe`**. Máy nhận EXE không cần Python. Chưa đo kích thước/tốc độ build Windows thực tế, không cam kết số MB hoặc thời gian cụ thể.
 
 ```powershell
-py -3.12 -m venv .venv
+python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 .venv\Scripts\python app.py
 # Đóng gói:
@@ -42,3 +42,11 @@ python -m unittest discover -s tests -v
 `app.py` mở app; `inbaocao/gui.py` là giao diện; `core.py` xử lý DOCX/Excel; `printing.py` làm việc với Word; `storage.py` quản lý kho mẫu. Chỉ cần openpyxl và pywin32 trên Windows; việc sửa/trộn DOCX dùng thư viện chuẩn Python, không cần python-docx hoặc bộ dựng PDF.
 
 Xem [kết quả kiểm thử Python](docs/KIEM_THU_PYTHON.md). Chưa xác minh Microsoft Word/driver máy in trên Windows thật. Workflow Windows dùng Python/PyInstaller; kết quả build thực tế xem trong GitHub Actions.
+
+Bộ cài tự nhận Python hiện có; Python 3.15 dùng pywin32 312 và PyInstaller 6.22.3. Bộ wheel Windows CPython 3.15 đã được kiểm tra phân giải và tải từ PyPI; chưa chạy ứng dụng trên Windows 3.15 thật.
+
+## Tự nhận Python và môi trường
+
+`CaiDat.cmd`, `CHAY_PHAN_MEM.bat`, `DONG_GOI_EXE.bat` dùng chung `scripts/ChonPython.cmd` và `scripts/windows_env.py`. Nhận Python 64-bit 3.10–3.15; không bắt cài 3.12 nếu đã có 3.15. Tái sử dụng `.venv` hoặc `.venv315` hợp lệ. Môi trường `.venv` lỗi được giữ dưới tên `.venv-backup-...`, sau đó tạo môi trường mới bằng Python hiện có. Chạy lại CaiDat.cmd để cập nhật phụ thuộc. Thư mục mẫu riêng trong AppData không bị ảnh hưởng.
+
+Workflow Windows được cấu hình kiểm thử/build trên cả 3.12 và 3.15; cấu hình này chưa được chạy trên GitHub cho tới khi đẩy bản sửa.

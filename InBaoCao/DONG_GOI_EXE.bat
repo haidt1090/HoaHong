@@ -1,23 +1,21 @@
 @echo off
 setlocal
-cd /d "%~dp0"
+chcp 65001 >nul
 set PYTHONUTF8=1
-if not exist ".venv\Scripts\python.exe" (
-  echo Hay chay CaiDat.cmd truoc.
-  pause
-  exit /b 1
-)
-".venv\Scripts\python.exe" -m pip install -r requirements-build.txt
-if errorlevel 1 goto failed
-".venv\Scripts\python.exe" -m unittest discover -s tests -v
-if errorlevel 1 goto failed
-".venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean InBaoCao.spec
-if errorlevel 1 goto failed
-start "" "%~dp0dist"
-echo Da dong goi thanh cong: dist\InBaoCao.exe
+pushd "%~dp0"
+if errorlevel 1 goto folder_error
+call scripts\ChonPython.cmd
+if errorlevel 1 goto runtime_error
+call %IBC_PY% scripts\windows_env.py build
+set "IBC_EXIT=%errorlevel%"
+popd
 pause
-exit /b 0
-:failed
-echo Dong goi chua thanh cong. Xem loi o tren; khong dung file EXE tu lan build loi.
+exit /b %IBC_EXIT%
+:runtime_error
+popd
+pause
+exit /b 1
+:folder_error
+echo Khong mo duoc thu muc source. Hay giai nen toan bo ZIP truoc khi chay.
 pause
 exit /b 1

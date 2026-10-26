@@ -1,11 +1,21 @@
 @echo off
 setlocal
-cd /d "%~dp0"
+chcp 65001 >nul
 set PYTHONUTF8=1
-if not exist ".venv\Scripts\python.exe" (
-  echo Chay CaiDat.cmd mot lan truoc khi mo phan mem.
-  pause
-  exit /b 1
-)
-".venv\Scripts\python.exe" app.py
-if errorlevel 1 pause
+pushd "%~dp0"
+if errorlevel 1 goto folder_error
+call scripts\ChonPython.cmd
+if errorlevel 1 goto runtime_error
+call %IBC_PY% scripts\windows_env.py run
+set "IBC_EXIT=%errorlevel%"
+popd
+if not "%IBC_EXIT%"=="0" pause
+exit /b %IBC_EXIT%
+:runtime_error
+popd
+pause
+exit /b 1
+:folder_error
+echo Khong mo duoc thu muc source. Hay giai nen toan bo ZIP truoc khi chay.
+pause
+exit /b 1

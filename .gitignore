@@ -7,3 +7,6 @@ dist/
 .pytest_cache/
 Thumbs.db
 Desktop.ini
+
+.venv315/
+.venv-backup-*/

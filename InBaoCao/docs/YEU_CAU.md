@@ -68,3 +68,7 @@ Người dùng yêu cầu chuyển sang file `.exe` để sử dụng, chỉnh s
 - Cho phép keyword riêng, tự nhận diện cột và chỉnh liên kết, giá trị thiếu để trống.
 - Giao source ZIP theo dạng người dùng đã quen: app.py, .spec, CHAY_PHAN_MEM.bat, DONG_GOI_EXE.bat, requirements.txt, HUONG_DAN.txt, Excel mẫu; bổ sung Word mẫu keyword và modules Python.
 - Không gửi dữ liệu người khám trong ZIP. Bản Electron cũ đã được xóa theo yêu cầu dọn sạch của người dùng. Bản Python được phép đẩy lên GitHub để tải source mới.
+
+## Tương thích Python hiện có — 26/10/2026
+
+Người dùng đã có Python 3.15 64-bit. Bộ cài/chạy/build phải tự nhận runtime hiện có, không ép cài thêm 3.12; cập nhật pywin32/PyInstaller tương thích. Không xóa mẫu riêng hoặc gỡ Python hệ thống khi sửa môi trường.
