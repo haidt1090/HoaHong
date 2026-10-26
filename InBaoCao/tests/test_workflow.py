@@ -152,19 +152,19 @@ class WorkflowTests(unittest.TestCase):
             def __init__(self):
                 self.calls = []
 
-            def PrintOut(self, **kwargs):
-                self.calls.append(("print", kwargs))
+            def PrintOut(self, *args):
+                self.calls.append(("print", args))
 
-            def Close(self, **kwargs):
-                self.calls.append(("close", kwargs))
+            def Close(self, save_changes, /):
+                self.calls.append(("close", save_changes))
 
         class Documents:
             def __init__(self):
                 self.docs = []
 
-            def Open(self, path, **kwargs):
+            def Open(self, path, confirm, read_only, recent, /):
                 self_outer.assertEqual(scan_tokens(path), [])
-                self_outer.assertTrue(kwargs["ReadOnly"])
+                self_outer.assertEqual((confirm, read_only, recent), (False, True, False))
                 doc = Document()
                 self.docs.append(doc)
                 return doc
@@ -182,10 +182,11 @@ class WorkflowTests(unittest.TestCase):
                 self.flagged.append(name)
                 self.FilePrintSetup = self.setup_printer
 
-            def setup_printer(self, **kwargs):
-                self.printer = kwargs
+            def setup_printer(self, *args):
+                self.printer = args
 
-            def Quit(self, **kwargs):
+            def Quit(self, save_changes, /):
+                self_outer.assertEqual(save_changes, 0)
                 self.quit = True
 
         self_outer = self
@@ -207,10 +208,10 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(word.quit)
         self.assertFalse(word.Visible)
         self.assertEqual(word.flagged, ["FilePrintSetup"])
-        self.assertEqual(word.printer["DoNotSetAsSysDefault"], 1)
+        self.assertEqual(word.printer, ("Máy in A3", 0, 0, 1))
         for doc in word.Documents.docs:
             self.assertEqual(
-                doc.calls[0], ("print", {"Background": False, "Copies": 1})
+                doc.calls[0], ("print", (False, False, 0, "", "", "", 0, 1))
             )
             self.assertEqual(doc.calls[1][0], "close")
 
@@ -218,10 +219,10 @@ class WorkflowTests(unittest.TestCase):
         event = threading.Event()
 
         class Doc:
-            def PrintOut(self, **kwargs):
+            def PrintOut(self, *args):
                 event.set()
 
-            def Close(self, **kwargs):
+            def Close(self, *args):
                 pass
 
         class Word:
@@ -235,7 +236,7 @@ class WorkflowTests(unittest.TestCase):
             def Open(self, *args, **kwargs):
                 return Doc()
 
-            def Quit(self, **kwargs):
+            def Quit(self, *args):
                 self.quit = True
 
         word = Word()
@@ -276,7 +277,7 @@ class WorkflowTests(unittest.TestCase):
         class Word:
             WordBasic = None
 
-            def Quit(self, **kwargs):
+            def Quit(self, *args):
                 raise RuntimeError("cleanup failed")
 
         with self.assertRaisesRegex(RuntimeError, "chọn máy in Máy A3") as caught:

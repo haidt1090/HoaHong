@@ -17,6 +17,7 @@ from .core import (
     row_values,
     scan_tokens,
 )
+from . import __version__
 from .storage import Library
 from .printing import open_document, list_printers, print_batch
 
@@ -81,7 +82,7 @@ class App:
 
     def _build(self):
         r = self.root
-        r.title("InBaoCao · Word & Excel · Python 2.0")
+        r.title(f"InBaoCao · Word & Excel · Python {__version__}")
         width = min(1320, max(960, r.winfo_screenwidth() - 80))
         height = min(880, max(620, r.winfo_screenheight() - 100))
         r.geometry(f"{width}x{height}")

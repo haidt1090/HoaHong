@@ -97,7 +97,9 @@ def print_batch(
             flag_method = getattr(word_basic, "_FlagAsMethod", None)
             if callable(flag_method):
                 flag_method("FilePrintSetup")
-            word_basic.FilePrintSetup(Printer=printer, DoNotSetAsSysDefault=1)
+            # WordBasic: Printer, Options, Network, DoNotSetAsSysDefault.
+            # _FlagAsMethod creates a *args-only pywin32 wrapper: no keywords.
+            word_basic.FilePrintSetup(printer, 0, 0, 1)
         with TemporaryDirectory(prefix="inbaocao-print-") as work:
             for index, row in enumerate(rows):
                 if cancel.is_set():
@@ -112,12 +114,15 @@ def print_batch(
                     stage = f"mở sổ người thứ {index + 1} trong Word"
                     document = word.Documents.Open(
                         str(target.resolve()),
-                        ReadOnly=True,
-                        AddToRecentFiles=False,
-                        ConfirmConversions=False,
+                        False,  # ConfirmConversions
+                        True,  # ReadOnly
+                        False,  # AddToRecentFiles
                     )
                     stage = f"gửi lệnh in người thứ {index + 1}"
-                    document.PrintOut(Background=False, Copies=1)
+                    # Background, Append, Range, OutputFileName, From, To,
+                    # Item (wdPrintDocumentContent=0), Copies. Positional COM
+                    # arguments also work when type metadata is unavailable.
+                    document.PrintOut(False, False, 0, "", "", "", 0, 1)
                     submitted += 1
                     progress(submitted, len(rows))
                     stage = f"đóng sổ người thứ {index + 1}"
@@ -125,7 +130,7 @@ def print_batch(
                     if document is not None:
                         original_error = sys.exc_info()[0] is not None
                         try:
-                            document.Close(SaveChanges=0)
+                            document.Close(0)
                         except Exception:
                             if not original_error:
                                 raise
@@ -138,7 +143,7 @@ def print_batch(
         try:
             if word is not None:
                 try:
-                    word.Quit(SaveChanges=0)
+                    word.Quit(0)
                 except Exception:
                     if not failed:
                         raise

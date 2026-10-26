@@ -28,3 +28,14 @@
 Sửa lỗi kết nối Word: bỏ qua wrapper COM sinh sẵn, báo rõ bước lỗi và giữ nguyên lỗi gốc nếu đóng Word thất bại. Đếm sổ ngay sau PrintOut thành công để tránh in trùng khi đóng tài liệu lỗi. Kiểm tra tự động: 14 bài đạt, 4 bài GUI bỏ qua; chưa xác minh in thực tế trên Windows.
 
 Sửa bước chọn máy in: đánh dấu FilePrintSetup là phương thức COM bằng _FlagAsMethod trước khi gọi, vì WordBasic thiếu metadata có thể khiến pywin32 đọc thành thuộc tính None. Bài kiểm tra mô phỏng FilePrintSetup ban đầu là None và chỉ gọi được sau khi đánh dấu; 14 bài đạt, 4 bài GUI bỏ qua. Cần xác minh tiếp trên Word Windows thực tế.
+
+
+## Sửa tham số COM — bản 2.0.1, 27/10/2026
+
+- Hai lần sửa trước chưa đủ: `_FlagAsMethod` nhận đúng phương thức nhưng pywin32 tạo `def FilePrintSetup(self, *args)`, không có `**kwargs`. Test trước dùng mock nhận `**kwargs`, nên bỏ sót lỗi thực tế.
+- Đọc trực tiếp `win32com/client/dynamic.py` (`_FlagAsMethod`, `_make_method_`) và `build.py` (`MakeVarArgsFuncMethod`) trong wheel pywin32 312 đang ghim. Tái hiện lỗi keyword bằng chính hàm sinh mã trích nguyên từ wheel, không sửa mã thư viện. Tài liệu web Microsoft không truy cập được trong môi trường này.
+- Đổi lời gọi WordBasic sang tham số vị trí `FilePrintSetup(printer, 0, 0, 1)` (Printer, Options, Network, DoNotSetAsSysDefault). Không chuyển sang thay máy in mặc định toàn hệ thống.
+- Rà và chuyển các lời gọi Open, PrintOut, Close, Quit sang tham số vị trí để tránh phụ thuộc tên tham số/type metadata. Giữ ReadOnly, bỏ recent files, in đồng bộ một bản, không lưu thay đổi.
+- Test workflow chỉ nhận tham số vị trí. Bổ sung `test_com_contract.py` dùng generator thực của pywin32, kiểm tra chuỗi chọn máy in/mở/in/đóng tài liệu/thoát và tái hiện lỗi keyword cũ. CI Windows sẽ chạy bài này với pywin32 đã cài, không cần Word/máy in.
+- Tại Linux: chạy riêng bài contract bằng hàm generator trích từ wheel: 1/1 đạt. Bộ kiểm tra thường: 14 đạt, 5 bỏ qua (4 GUI và 1 pywin32 Windows). Chưa xác minh Microsoft Word hoặc máy in thực trên Windows; không coi mô phỏng COM là kết quả in thực tế.
+- Tiêu đề cửa sổ hiển thị phiên bản 2.0.1 để nhận biết bản đang chạy.
