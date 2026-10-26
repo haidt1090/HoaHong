@@ -72,3 +72,7 @@ Người dùng yêu cầu chuyển sang file `.exe` để sử dụng, chỉnh s
 ## Tương thích Python hiện có — 26/10/2026
 
 Người dùng đã có Python 3.15 64-bit. Bộ cài/chạy/build phải tự nhận runtime hiện có, không ép cài thêm 3.12; cập nhật pywin32/PyInstaller tương thích. Không xóa mẫu riêng hoặc gỡ Python hệ thống khi sửa môi trường.
+
+## Hiển thị thông tin điều khiển in — 26/10/2026
+
+Người dùng báo hàng nút dưới cùng bị cắt và yêu cầu hiện thông tin để theo dõi. Giữ rõ nút BẮT ĐẦU IN HÀNG LOẠT, Xem thử, Xuất Word và Dừng; hiện mẫu, máy in, số người được chọn cùng tiến độ/lỗi/hoàn tất, không yêu cầu review từng người.

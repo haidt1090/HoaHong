@@ -59,7 +59,7 @@ Không tự coi Địa chỉ thường trú là Nơi ở hiện tại hoặc B�
 - Không có cột: chọn để trống hoặc điền Giá trị chung (ví dụ tên công ty).
 - Bấm Lưu liên kết để dùng cho các lần sau.
 - Bấm chọn một dòng rồi Xem thử 1 người: mở đúng một bản Word đã điền.
-- Muốn in ngay: chọn máy in thực tế, chọn các người cần in, bấm IN HÀNG LOẠT.
+- Muốn in ngay: chọn máy in thực tế, chọn các người cần in, bấm BẮT ĐẦU IN HÀNG LOẠT.
   Không bắt buộc xem thử và không hiện review từng sổ. Mỗi người là một lệnh in.
 - Mẫu Word quyết định cỡ giấy A3 và hướng giấy; ứng dụng không đổi thiết lập mặc định của máy in.
 - Máy in ảo PDF/XPS có thể hỏi tên file cho từng người. Chọn máy in A3 thực để in liên tục.
@@ -92,3 +92,9 @@ InBaoCao.spec           Cấu hình đóng gói PyInstaller một file EXE
 KIỂM THỬ: python -m unittest discover -s tests -v
 Bản này đã kiểm tra logic và giao diện tại môi trường phát triển;
 chưa xác minh in A3 vật lý hay chạy Word automation trên Windows thật.
+
+THÔNG TIN IN LUÔN HIỆN Ở PHÍA DƯỚI
+- Mẫu đang dùng, số người được chọn/tổng số và máy in hiện tại.
+- Nút BẮT ĐẦU IN HÀNG LOẠT luôn giữ đủ chiều cao; màn hình hẹp tự chia hai hàng nút.
+- Trạng thái đang gửi, số sổ đã gửi, đã dừng, hoàn tất hoặc lỗi.
+- Số sổ đã gửi là số lệnh đã vào hàng đợi, không xác nhận giấy đã ra khỏi máy in.

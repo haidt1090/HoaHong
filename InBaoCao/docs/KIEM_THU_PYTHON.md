@@ -17,3 +17,9 @@
 
 - Tổng 13/13 bài kiểm thử: 6 luồng Word/Excel/in và 7 luồng chọn Python, nhận `.venv315`, bảo toàn môi trường lỗi, dùng đúng interpreter và giữ mã lỗi pip/build.
 - Không báo build thành công nếu không có EXE đầu ra. Đã cấu hình CI Windows matrix 3.12/3.15; chưa chạy CI bản sửa, chưa xác minh Word COM trên máy Windows 3.15 thật.
+
+## Hiển thị điều khiển in — 26/10/2026
+
+- Vùng in cố định ngoài vùng nội dung co giãn; bảng lớn không đẩy hàng nút khỏi cửa sổ. Hàng nút tự xuống hai dòng khi tổng chiều rộng yêu cầu vượt phần hiển thị.
+- 4 kiểm thử GUI thực trên Linux/Xvfb: 9 tổ hợp kích thước/DPI, vùng nhập liệu cao bất thường, nút quá rộng và trạng thái chọn người/tiến độ/dừng/hoàn tất. Không gửi lệnh tới máy in thật.
+- Chạy cùng 13 bài logic bằng `INBAOCAO_GUI_TESTS=1`: tổng 17 bài. Nếu không bật biến này, 4 bài GUI được bỏ qua có chủ ý. Chưa xác minh bố cục bản sửa trên Windows thật.
