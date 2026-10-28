@@ -12,8 +12,9 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 MIN_VERSION = (3, 10)
-MAX_VERSION = (3, 14)
+MAX_VERSION = (3, 15)
 WINDOWS = os.name == "nt"
+RUN_LOG = None
 PROBE = "import json,sys,struct; print(json.dumps({'version':list(sys.version_info[:2]),'bits':struct.calcsize('P')*8}))"
 
 
@@ -40,7 +41,20 @@ def probe_python(executable):
 
 
 def execute(executable, *arguments):
-    subprocess.run([str(executable), *map(str, arguments)], cwd=ROOT, check=True)
+    command = [str(executable), *map(str, arguments)]
+    child_env = os.environ.copy()
+    child_env["PYTHONUTF8"] = "1"
+    with subprocess.Popen(command, cwd=ROOT, env=child_env, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                          errors="replace", bufsize=1) as process:
+        for line in process.stdout:
+            print(line, end="", flush=True)
+            if RUN_LOG is not None:
+                RUN_LOG.write(line)
+                RUN_LOG.flush()
+        code = process.wait()
+    if code:
+        raise subprocess.CalledProcessError(code, command)
 
 
 def choose_environment(root=ROOT):
@@ -64,9 +78,8 @@ def create_environment(root=ROOT, creator=sys.executable):
 
 
 def check_runtime_dependencies(executable):
-    imports = "import tkinter, selenium"
-    if WINDOWS:
-        imports += "; import pywinauto"
+    imports = "import tkinter, selenium; from kyso.gui import SignerApp"
+    # UI Automation is optional; importing it must not block manual mode.
     result = subprocess.run([str(executable), "-c", imports], cwd=ROOT, capture_output=True, text=True)
     return result.returncode == 0
 
@@ -87,9 +100,10 @@ def setup(executable, build=False):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=["setup", "run", "build"])
+    parser.add_argument("--smoke-test", action="store_true", help="Open and close GUI with no browser/token activity")
     args = parser.parse_args(argv)
     if not compatible(sys.version_info[:2], struct.calcsize("P") * 8):
-        print("Cần Python 64-bit 3.10–3.14 có Tcl/Tk.", file=sys.stderr)
+        print("Cần Python 64-bit 3.10–3.15 có Tcl/Tk.", file=sys.stderr)
         return 1
     try:
         if args.mode in ("run", "build") and not WINDOWS:
@@ -103,7 +117,7 @@ def main(argv=None):
         if args.mode == "setup":
             print("Cài đặt xong. Mở CHAY_PHAN_MEM.bat để chạy.", flush=True)
         elif args.mode == "run":
-            execute(executable, ROOT / "app.py")
+            execute(executable, ROOT / "app.py", *(["--smoke-test"] if args.smoke_test else []))
         else:
             execute(executable, "-m", "unittest", "discover", "-s", "tests", "-v")
             execute(executable, "-m", "PyInstaller", "--noconfirm", "--clean", ROOT / "KySoPython.spec")
@@ -120,5 +134,28 @@ def main(argv=None):
         return 1
 
 
+def logged_main():
+    global RUN_LOG
+    import tempfile
+    root = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "KySoPython" / "diagnostics"
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        path = root / "last-launch.log"
+        stream = path.open("w", encoding="utf-8")
+    except OSError:
+        return main()  # Logging is optional; never retry a command that already ran.
+    try:
+        with stream:
+            RUN_LOG = stream
+            print(f"Nhat ky cai dat/khoi dong: {path}", flush=True)
+            stream.write(f"Python {sys.version.split()[0]}, {struct.calcsize('P') * 8}-bit\n")
+            stream.flush()
+            code = main()
+            stream.write(f"\nExit code: {code}\n")
+            return code
+    finally:
+        RUN_LOG = None
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(logged_main())

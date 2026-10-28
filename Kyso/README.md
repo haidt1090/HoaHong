@@ -6,7 +6,7 @@ Bản này có mã nguồn, bộ chạy và cấu hình đóng gói EXE. Phần 
 
 ## Cài và mở trên Windows
 
-Cần Windows 10/11, Google Chrome, Python **64-bit 3.10–3.14 có Tcl/Tk**, driver USB Token và chứng thư còn hiệu lực. Máy ký phải đăng nhập được hệ thống bằng tài khoản có quyền ký. USB phải đang cắm và chứng thư có private key phải xuất hiện trong kho chứng thư Windows.
+Cần Windows 10/11, Google Chrome, Python **64-bit 3.10–3.15 có Tcl/Tk**, driver USB Token và chứng thư còn hiệu lực. Máy ký phải đăng nhập được hệ thống bằng tài khoản có quyền ký. USB phải đang cắm và chứng thư có private key phải xuất hiện trong kho chứng thư Windows.
 
 1. Giải nén toàn bộ mã nguồn vào một thư mục mới.
 2. Chạy `CaiDat.cmd` một lần để tạo `.venv` và cài dependency.
@@ -80,3 +80,9 @@ Các test dùng bộ giả lập browser/hộp thoại để kiểm tra phân tr
 - `kyso/workflow.py`: trình tự ký, dừng và thống kê.
 - `kyso/settings.py`: cấu hình cục bộ.
 - `scripts/windows_env.py`: cài, chạy và build trong môi trường Python riêng.
+
+## Nếu cài xong nhưng không mở được
+
+Bản sửa bộ chạy nhận cả Python 3.15. Khi bị lỗi, cửa sổ lệnh được giữ mở và log nằm tại `%LOCALAPPDATA%\KySoPython\diagnostics\last-launch.log`. Gửi thông báo lỗi hoặc file log này để xác định nguyên nhân trên máy của bạn. Bộ chạy không lưu PIN trong log.
+
+Tải ZIP mới và giải nén sang thư mục mới, chạy `CaiDat.cmd`, sau đó `CHAY_PHAN_MEM.bat`. Có thể kiểm tra riêng khả năng mở GUI bằng Terminal: `CHAY_PHAN_MEM.bat --smoke-test`; chế độ này tự đóng sau khi mở giao diện, không truy cập Chrome hoặc USB Token. Python cần bản 64-bit có Tcl/Tk; bộ chạy không ép gỡ Python đang dùng.

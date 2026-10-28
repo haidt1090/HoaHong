@@ -37,3 +37,11 @@ Smoke test browser chạy trên Linux có Chromium/ChromeDriver cùng phiên b�
 Chưa đăng nhập hoặc gọi API của admin.csdlksk.vn, chưa thao tác USB Token thật, chưa chạy UI Automation Windows thật, chưa build/chạy EXE Windows. Không có tài khoản, PIN hoặc hồ sơ thật được dùng để kiểm tra. Selector và API dựa vào bản EXE người dùng cung cấp, có thể khác phiên bản website hiện tại.
 
 Để nghiệm thu trên máy ký: cài driver USB, mở Chrome/đăng nhập, quét danh sách, thử một hồ sơ bằng chế độ PIN thủ công, kiểm tra chữ ký và trạng thái trên website. Sau đó mới thử chế độ tự nhập PIN nếu hộp thoại tương thích. Khi gặp lỗi, giữ nguyên tab và kiểm tra trạng thái trước khi thử lại; không tự động ký lại hồ sơ chưa rõ kết quả.
+
+## Kiểm tra lại bộ chạy — 29/10/2026
+
+Sửa nhận Python 3.15 và `py -3`; giữ cửa sổ lỗi, lưu stdout/stderr của tiến trình con vào log khởi động và giữ đúng mã lỗi. Kiểm tra thư viện mở giao diện không còn bắt import pywinauto trước khi dùng chế độ PIN tự động. Thêm `app.py --smoke-test` để mở/đóng giao diện mà không truy cập Chrome hoặc USB.
+
+Đã chạy **75 test, tất cả đạt, không skip**, gồm GUI thật trên Xvfb, browser localhost và 6 test bộ chạy/log. Đã chạy riêng `app.py --smoke-test` thành công. Đã tải/phân giải wheel Windows CPython 3.15 cho Selenium, pywinauto, PyInstaller và riêng pywin32 312, comtypes 1.4.17, pefile. Pip trên Linux dùng marker của máy chạy nên kiểm tra các dependency Windows được làm riêng; điều này không xác nhận chúng đã chạy trên Windows.
+
+Workflow Windows đã bổ sung việc gọi trực tiếp `CaiDat.cmd` và `CHAY_PHAN_MEM.bat --smoke-test` cho Python 3.12/3.15. Chưa có kết quả workflow này trong phiên sửa. Chưa xác định nguyên nhân cụ thể trên máy người dùng khi chưa nhận được lỗi/phiên bản Python; việc bản cũ từ chối Python 3.15 chỉ gây lỗi nếu máy dùng phiên bản đó.
