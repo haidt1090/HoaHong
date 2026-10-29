@@ -15,6 +15,7 @@ from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 from kyso import browser as browser_module
+from kyso import connection
 from kyso.browser import BrowserError, ChromeSession
 from kyso.windows import ManualTokenPrompt
 from kyso.workflow import BatchSigner
@@ -126,8 +127,13 @@ async function receipt(button) {
             driver.get(target + "/admin/operation/health-checkup")
             original_handle = driver.current_window_handle
             with patch.object(browser_module, "_origin", fixture_origin):
-                session = ChromeSession(base_url=target, driver=driver, keep_completed_tabs=True)
-                session.connect()
+                # Exercise the production attachment path, not an injected driver.
+                address = '127.0.0.1:' + driver.capabilities['goog:chromeOptions']['debuggerAddress'].rsplit(':', 1)[1]
+                session = ChromeSession(base_url=target, debugger_address=address, keep_completed_tabs=True)
+                with patch.object(connection.shutil, 'which', return_value=driver.service.path), \
+                     patch.dict(os.environ, {'HTTP_PROXY':'http://127.0.0.1:9', 'HTTPS_PROXY':'http://127.0.0.1:9', 'NO_PROXY':''}):
+                    session.connect()
+                    self.assertEqual(os.environ['HTTP_PROXY'], 'http://127.0.0.1:9')
                 records = session.scan_pending()
                 self.assertEqual([record.check_up_id for record in records], ["fixture-1", "fixture-2"])
                 result = BatchSigner(session, ManualTokenPrompt()).run(records)
@@ -143,9 +149,13 @@ async function receipt(button) {
                 for handle in driver.window_handles:
                     driver.switch_to.window(handle)
                     self.assertTrue(driver.current_url.startswith(target + "/"))
+                session.disconnect()
+                self.assertEqual(len(driver.window_handles), 3, "Disconnect closed the external browser")
         finally:
             # This driver/browser was created exclusively by this test. Production
             # ChromeSession.disconnect never calls quit on an attached browser.
+            if session is not None:
+                session.disconnect()
             if driver is not None:
                 driver.quit()
             server.shutdown()

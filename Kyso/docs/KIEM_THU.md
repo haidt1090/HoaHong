@@ -51,3 +51,11 @@ Workflow Windows đã bổ sung việc gọi trực tiếp `CaiDat.cmd` và `CHA
 Ảnh lỗi người dùng xác nhận giao diện mở được nhưng thất bại ở socket probe trước khi mở Chrome. Bản cũ chỉ coi ConnectionRefusedError là cổng trống; TimeoutError/WinError 10060 bị báo lỗi chung. Bản sửa kiểm tra quyền sở hữu cổng bằng exclusive bind trên Windows khi probe timeout; chỉ mở Chrome nếu cổng trống. Cổng bị chiếm không được coi là trống. Nếu bị chặn hoặc dành riêng, thông báo giữ mã Windows (ví dụ 10013) để chẩn đoán. Endpoint HTTP đang khởi động được chờ thay vì kết luận nhầm ứng dụng khác.
 
 82 test đã chạy, tất cả đạt, không skip: thêm các trường hợp timeout, Winsock 10060/10013/10048, endpoint HTTP chưa sẵn sàng, socket trống thật và HTTP localhost thật. Chưa tái hiện trên Windows của người dùng; cần thử lại bản sửa để xác nhận timeout hay quyền truy cập là nguyên nhân cụ thể. Không thay cấu hình tường lửa và không chiếm cổng đang có dịch vụ.
+
+## Sửa nút Kết nối Chrome — 29/10/2026
+
+Đã tái hiện bằng ChromeDriver 156: `InvalidArgumentException: cannot parse capability: goog:chromeOptions / unrecognized chrome option: detach` khi gửi cả debuggerAddress và detach như bản cũ. Bỏ detach khỏi chế độ attach.
+
+Bộ smoke test trước dùng driver truyền sẵn nên đã bỏ qua nhánh tạo driver trong ứng dụng và không phát hiện lỗi này. Smoke test hiện đi qua chính ChromeSession.connect() và factory của ứng dụng, đọc endpoint phiên bản Chrome thật, chọn driver cục bộ, kết nối vào Chrome đang chạy, quét fixture và thực hiện đủ chuỗi nút. Chạy cả với HTTP_PROXY/HTTPS_PROXY cố tình trỏ tới proxy localhost không hoạt động: kết nối WebDriver vẫn đạt và biến môi trường vẫn nguyên. Đã xác minh disconnect giữ Chrome và cả ba tab qua phiên driver bên ngoài.
+
+90 test chạy đầy đủ, tất cả đạt, không skip. Thêm 8 test chọn driver, giữ lỗi gốc, bỏ detach và xử lý proxy cục bộ. Đã chạy lại riêng smoke test sau khi thêm kiểm tra Chrome vẫn mở sau disconnect. Bản sửa chưa chạy trên máy Windows người dùng; việc ký thật/API thật/USB vẫn chưa kiểm chứng.

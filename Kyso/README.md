@@ -86,3 +86,11 @@ Các test dùng bộ giả lập browser/hộp thoại để kiểm tra phân tr
 Bản sửa bộ chạy nhận cả Python 3.15. Khi bị lỗi, cửa sổ lệnh được giữ mở và log nằm tại `%LOCALAPPDATA%\KySoPython\diagnostics\last-launch.log`. Gửi thông báo lỗi hoặc file log này để xác định nguyên nhân trên máy của bạn. Bộ chạy không lưu PIN trong log.
 
 Tải ZIP mới và giải nén sang thư mục mới, chạy `CaiDat.cmd`, sau đó `CHAY_PHAN_MEM.bat`. Có thể kiểm tra riêng khả năng mở GUI bằng Terminal: `CHAY_PHAN_MEM.bat --smoke-test`; chế độ này tự đóng sau khi mở giao diện, không truy cập Chrome hoặc USB Token. Python cần bản 64-bit có Tcl/Tk; bộ chạy không ép gỡ Python đang dùng.
+
+## Chrome mở được nhưng nút Kết nối báo lỗi
+
+Bản sửa bỏ tùy chọn `detach` khi dùng `debuggerAddress`: ChromeDriver từ chối tùy chọn mở trình duyệt này trong chế độ kết nối vào Chrome đã chạy. Lỗi đã được tái hiện bằng Chromium/ChromeDriver 156 trước khi sửa.
+
+Tool đọc phiên bản từ Chrome đang mở để chọn ChromeDriver, bỏ qua driver cũ khác major trên PATH. Kết nối điều khiển localhost đi trực tiếp; proxy của quá trình tải driver vẫn được giữ. Nếu mạng không tải được driver, thông báo nêu lỗi gốc và các đích Google cần truy cập. Có thể đặt ChromeDriver tương thích vào thư mục `drivers` cạnh `app.py` để dùng cục bộ.
+
+Lỗi kết nối được hiện chi tiết và lưu tại `%LOCALAPPDATA%\KySoPython\diagnostics\last-connection.log`. Log này chỉ phục vụ bước kết nối, không đọc PIN hoặc cookie. Nếu vẫn lỗi, gửi thông báo mới hoặc log kết nối này.

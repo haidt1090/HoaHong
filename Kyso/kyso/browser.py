@@ -106,18 +106,18 @@ class ChromeSession:
         created = self.driver is None
         if created:
             try:
-                from selenium import webdriver
-                options = webdriver.ChromeOptions()
-                options.debugger_address = self.debugger_address
-                options.add_experimental_option("detach", True)
-                self.driver = webdriver.Chrome(options=options)
+                from .connection import attach
+                self.driver = attach(self.debugger_address, self.log)
             except ImportError as exc:
                 raise BrowserError("Chưa cài Selenium. Chạy CaiDat.cmd trước.") from exc
             except Exception as exc:
-                raise BrowserError(
-                    "Không kết nối được Chrome. Mở Chrome bằng nút Mở Chrome, "
-                    "đăng nhập hệ thống rồi thử lại; kiểm tra ChromeDriver phù hợp phiên bản Chrome."
-                ) from exc
+                from .connection import safe_error, save_failure
+                detail = safe_error(exc)
+                self.log(detail)
+                saved = save_failure(detail)
+                if saved:
+                    self.log(f"Chi tiết kết nối đã lưu tại {saved}")
+                raise BrowserError(detail) from exc
         try:
             name = str(self.driver.capabilities.get("browserName", "")).lower()
             if name not in ("chrome", "chromium"):
