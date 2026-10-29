@@ -197,3 +197,65 @@ class WindowsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DebuggerSocketRegressionTests(unittest.TestCase):
+    def test_windows_timeout_on_unused_port_is_free(self):
+        with patch.object(windows.socket, 'create_connection', side_effect=TimeoutError), \
+             patch.object(windows.socket, 'socket') as factory:
+            self.assertEqual(windows._debugger_state(9222), 'free')
+        factory.return_value.__enter__.return_value.bind.assert_called_once_with(('127.0.0.1', 9222))
+
+    def test_windows_10060_oserror_uses_ownership_probe(self):
+        failure = OSError('timeout')
+        failure.winerror = 10060
+        with patch.object(windows.socket, 'create_connection', side_effect=failure), \
+             patch.object(windows, '_port_after_timeout', return_value='free') as probe:
+            self.assertEqual(windows._debugger_state(9222), 'free')
+        probe.assert_called_once_with(9222)
+
+    def test_timeout_does_not_treat_occupied_port_as_free(self):
+        failure = OSError('in use')
+        failure.winerror = 10048
+        with patch.object(windows.socket, 'socket') as factory:
+            factory.return_value.__enter__.return_value.bind.side_effect = failure
+            self.assertEqual(windows._port_after_timeout(9222), 'unready')
+
+    def test_permission_error_reports_windows_code(self):
+        failure = PermissionError('blocked')
+        failure.winerror = 10013
+        with patch.object(windows.socket, 'create_connection', side_effect=failure):
+            with self.assertRaisesRegex(windows.TokenError, '10013'):
+                windows._debugger_state(9222)
+
+    def test_http_startup_timeout_is_not_a_wrong_application(self):
+        opener = Mock()
+        opener.open.side_effect = TimeoutError
+        with patch.object(windows.socket, 'create_connection'), patch.object(windows, 'build_opener', return_value=opener):
+            self.assertEqual(windows._debugger_state(9222), 'unready')
+
+    def test_real_unused_loopback_port(self):
+        import socket
+        with socket.socket() as sock:
+            sock.bind(('127.0.0.1', 0))
+            port = sock.getsockname()[1]
+        self.assertEqual(windows._debugger_state(port), 'free')
+
+    def test_real_chrome_metadata_over_local_http(self):
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(json.dumps({'Browser':'Chrome/156', 'webSocketDebuggerUrl':f'ws://127.0.0.1:{self.server.server_port}/devtools/browser/test'}).encode())
+            def log_message(self, *args):
+                pass
+        server = ThreadingHTTPServer(('127.0.0.1',0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            self.assertEqual(windows._debugger_state(server.server_port), 'chrome')
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()

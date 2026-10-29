@@ -45,3 +45,9 @@ Sửa nhận Python 3.15 và `py -3`; giữ cửa sổ lỗi, lưu stdout/stderr
 Đã chạy **75 test, tất cả đạt, không skip**, gồm GUI thật trên Xvfb, browser localhost và 6 test bộ chạy/log. Đã chạy riêng `app.py --smoke-test` thành công. Đã tải/phân giải wheel Windows CPython 3.15 cho Selenium, pywinauto, PyInstaller và riêng pywin32 312, comtypes 1.4.17, pefile. Pip trên Linux dùng marker của máy chạy nên kiểm tra các dependency Windows được làm riêng; điều này không xác nhận chúng đã chạy trên Windows.
 
 Workflow Windows đã bổ sung việc gọi trực tiếp `CaiDat.cmd` và `CHAY_PHAN_MEM.bat --smoke-test` cho Python 3.12/3.15. Chưa có kết quả workflow này trong phiên sửa. Chưa xác định nguyên nhân cụ thể trên máy người dùng khi chưa nhận được lỗi/phiên bản Python; việc bản cũ từ chối Python 3.15 chỉ gây lỗi nếu máy dùng phiên bản đó.
+
+## Sửa kiểm tra cổng Chrome — 29/10/2026
+
+Ảnh lỗi người dùng xác nhận giao diện mở được nhưng thất bại ở socket probe trước khi mở Chrome. Bản cũ chỉ coi ConnectionRefusedError là cổng trống; TimeoutError/WinError 10060 bị báo lỗi chung. Bản sửa kiểm tra quyền sở hữu cổng bằng exclusive bind trên Windows khi probe timeout; chỉ mở Chrome nếu cổng trống. Cổng bị chiếm không được coi là trống. Nếu bị chặn hoặc dành riêng, thông báo giữ mã Windows (ví dụ 10013) để chẩn đoán. Endpoint HTTP đang khởi động được chờ thay vì kết luận nhầm ứng dụng khác.
+
+82 test đã chạy, tất cả đạt, không skip: thêm các trường hợp timeout, Winsock 10060/10013/10048, endpoint HTTP chưa sẵn sàng, socket trống thật và HTTP localhost thật. Chưa tái hiện trên Windows của người dùng; cần thử lại bản sửa để xác nhận timeout hay quyền truy cập là nguyên nhân cụ thể. Không thay cấu hình tường lửa và không chiếm cổng đang có dịch vụ.

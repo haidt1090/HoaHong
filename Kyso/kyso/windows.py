@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import errno
 import os
 from pathlib import Path
 import re
@@ -88,15 +89,47 @@ ConvertTo-Json -InputObject $items -Compress
     return _parse_certificates(proc.stdout.decode("utf-8-sig", errors="replace"))
 
 
+def _port_after_timeout(port: int) -> str:
+    """Windows may time out rather than refuse a connection to an unused port.
+
+    Check ownership without listening or changing another process's socket.
+    Exclusive bind on Windows prevents sharing an existing listener's address.
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            probe.bind(("127.0.0.1", port))
+        return "free"
+    except OSError as exc:
+        code = getattr(exc, "winerror", None) or exc.errno
+        if code in (errno.EADDRINUSE, 10048):
+            return "unready"
+        raise TokenError(
+            f"Windows không cho kiểm tra cổng {port} (mã {code}). "
+            "Cổng có thể bị dành riêng hoặc bị phần mềm bảo mật chặn. "
+            "Không cần tắt tường lửa; kiểm tra quyền truy cập cổng loopback.") from exc
+
+
 def _debugger_state(port: int) -> str:
-    """Return free/chrome/occupied; never use an outbound proxy for loopback."""
+    """Return free/chrome/occupied/unready; never proxy loopback requests."""
     try:
         with socket.create_connection(("127.0.0.1", port), timeout=0.4):
             pass
     except ConnectionRefusedError:
         return "free"
+    except TimeoutError:
+        return _port_after_timeout(port)
     except OSError as exc:
-        raise TokenError("Không kiểm tra được cổng Chrome Debug trên máy này.") from exc
+        code = getattr(exc, "winerror", None) or exc.errno
+        if code in (errno.ECONNREFUSED, 10061):
+            return "free"
+        if code in (errno.ETIMEDOUT, 10060):
+            return _port_after_timeout(port)
+        raise TokenError(
+            f"Không kiểm tra được cổng Chrome Debug 127.0.0.1:{port} "
+            f"(mã {code}, {type(exc).__name__}). "
+            "Kiểm tra quyền kết nối loopback của Python/Chrome.") from exc
     try:
         opener = build_opener(ProxyHandler({}))
         with opener.open(f"http://127.0.0.1:{port}/json/version", timeout=1.5) as response:
@@ -114,7 +147,9 @@ def _debugger_state(port: int) -> str:
             and websocket.path.startswith("/devtools/browser/")
         ):
             return "chrome"
-    except (OSError, ValueError, TypeError, AttributeError):
+    except OSError:
+        return "unready"
+    except (ValueError, TypeError, AttributeError):
         pass
     return "occupied"
 
@@ -130,6 +165,8 @@ def launch_chrome(base_url: str = "https://admin.csdlksk.vn", port: int = 9222) 
     state = _debugger_state(port)
     if state == "chrome":
         return
+    if state == "unready":
+        raise TokenError(f"Cổng {port} có ứng dụng sử dụng nhưng chưa phản hồi Chrome Debug. Chờ Chrome khởi động rồi thử lại.")
     if state != "free":
         raise TokenError(f"Cổng {port} đang được ứng dụng khác sử dụng; hãy đóng ứng dụng đó.")
     local = os.environ.get("LOCALAPPDATA")
