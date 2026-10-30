@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from threading import Event
 import unittest
+from unittest.mock import Mock
 
 from kyso.workflow import BatchSigner
 
@@ -63,6 +64,83 @@ class FakeToken:
 
 
 class BatchSignerTests(unittest.TestCase):
+    def test_continuous_batches_100_100_5_then_empty_without_retries(self):
+        browser = FakeBrowser()
+        batches = [[Record(str(n)) for n in range(start, end)]
+                   for start, end in [(0, 100), (100, 200), (200, 205)]]
+        exclusions = []
+        def scan(stop, *, limit, exclude_ids):
+            self.assertEqual(limit, 100)
+            exclusions.append(set(exclude_ids))
+            return batches.pop(0) if batches else []
+        browser.scan_pending = scan
+        result = BatchSigner(browser, FakeToken()).run_pending()
+        self.assertEqual((result.attempted, result.completed_steps, result.failed), (205, 205, 0))
+        self.assertFalse(result.stopped)
+        self.assertEqual([len(ids) for ids in exclusions], [0, 100, 200, 205])
+        self.assertEqual([value for kind, value in browser.calls if kind == "open"], [str(n) for n in range(205)])
+
+    def test_continuous_failure_never_scans_next_batch(self):
+        browser = FakeBrowser(fail="Complete")
+        browser.scan_pending = Mock(return_value=[Record("a"), Record("b")])
+        result = BatchSigner(browser, FakeToken()).run_pending()
+        self.assertEqual((result.attempted, result.failed), (1, 1))
+        self.assertEqual(result.needs_review, ["a"])
+        browser.scan_pending.assert_called_once()
+
+    def test_continuous_stop_finishes_current_record_without_rescan(self):
+        stop = Event()
+        browser = FakeBrowser(after_security=stop.set)
+        browser.scan_pending = Mock(return_value=[Record("a"), Record("b")])
+        result = BatchSigner(browser, FakeToken()).run_pending(stop_event=stop)
+        self.assertEqual(result.completed_steps, 1)
+        self.assertTrue(result.stopped)
+        browser.scan_pending.assert_called_once()
+
+    def test_continuous_repeated_snapshot_stops_before_signing_twice(self):
+        browser = FakeBrowser()
+        browser.scan_pending = Mock(side_effect=[[Record("a")], [Record("a")]])
+        result = BatchSigner(browser, FakeToken()).run_pending()
+        self.assertEqual(result.attempted, 1)
+        self.assertTrue(result.stopped)
+        self.assertTrue(result.error)
+
+    def test_continuous_scan_error_keeps_previous_counts(self):
+        browser = FakeBrowser()
+        browser.scan_pending = Mock(side_effect=[[Record("a")], RuntimeError("offline")])
+        result = BatchSigner(browser, FakeToken()).run_pending()
+        self.assertEqual(result.completed_steps, 1)
+        self.assertTrue(result.stopped)
+        self.assertTrue(result.error)
+
+    def test_continuous_preexisting_stop_never_scans(self):
+        stop = Event()
+        stop.set()
+        browser = FakeBrowser()
+        browser.scan_pending = Mock()
+        result = BatchSigner(browser, FakeToken()).run_pending(stop_event=stop)
+        browser.scan_pending.assert_not_called()
+        self.assertTrue(result.stopped)
+
+    def test_continuous_oversized_batch_never_opens_records(self):
+        browser = FakeBrowser()
+        browser.scan_pending = Mock(return_value=[Record(str(n)) for n in range(101)])
+        result = BatchSigner(browser, FakeToken()).run_pending()
+        self.assertTrue(result.stopped)
+        self.assertTrue(result.error)
+        self.assertEqual(browser.calls, [])
+
+    def test_continuous_stop_during_scan_never_opens_records(self):
+        stop = Event()
+        browser = FakeBrowser()
+        def scan(*args, **kwargs):
+            stop.set()
+            return [Record("a")]
+        browser.scan_pending = scan
+        result = BatchSigner(browser, FakeToken()).run_pending(stop_event=stop)
+        self.assertTrue(result.stopped)
+        self.assertEqual(browser.calls, [])
+
     def test_runs_selected_snapshot_once_in_order_and_never_claims_server_success(self):
         browser, token, logs = FakeBrowser(), FakeToken(), []
         result = BatchSigner(browser, token, logs.append).run(

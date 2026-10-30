@@ -26,14 +26,22 @@ python -m venv .venv
 
 1. Chọn **Mở Chrome**. Tool mở Chrome với profile riêng trong `%LOCALAPPDATA%\KySoPython\ChromeProfile`, chỉ bật cổng điều khiển tại `127.0.0.1:9222`.
 2. Đăng nhập `admin.csdlksk.vn` thủ công trong cửa sổ Chrome đó và mở trang danh sách hồ sơ.
-3. Kết nối Chrome, lấy danh sách chứng thư nếu cần, rồi **Quét hồ sơ**. Tool đọc API bằng phiên đăng nhập sẵn có trong Chrome, lấy các hồ sơ trạng thái `init` ở tất cả trang thành một danh sách cố định trước khi ký.
+3. Kết nối Chrome, lấy danh sách chứng thư nếu cần, rồi **Quét hồ sơ**. Tool đọc API bằng phiên đăng nhập sẵn có trong Chrome, lấy tối đa 100 hồ sơ trạng thái `init` theo thứ tự API thành một danh sách cố định trước khi ký.
 4. Chọn các hồ sơ cần ký. Giữ chế độ nhập PIN thủ công cho lần thử đầu. Khi có cửa sổ bảo mật, chọn đúng chứng thư và nhập PIN trên cửa sổ của USB Token; tool đợi nút Complete sẵn sàng.
 5. Kiểm tra số hồ sơ, xác nhận bắt đầu ký. Nếu bật tự nhập PIN, chọn đúng chứng thư và nhập PIN vào ô trong tool trước khi bắt đầu.
 6. Kiểm tra lại trạng thái hồ sơ trên hệ thống khi kết thúc. **Đã hoàn tất thao tác** chỉ xác nhận đã gửi click Complete, chưa xác nhận chữ ký đã được máy chủ ghi nhận.
 
+### Ký liên tục từng đợt 100
+
+Bấm **Ký liên tục từng đợt 100** và xác nhận để tự quét tối đa 100 hồ sơ chưa ký, ký lần lượt từng hồ sơ, rồi quét đợt tiếp theo. Nút này tự quét danh sách mới, không dùng lựa chọn đang hiển thị. Đợt cuối có thể ít hơn 100 hồ sơ. Đây là xử lý tuần tự, không mở 100 giao dịch USB Token đồng thời.
+
+Mỗi lần quét lại bắt đầu từ trang 1 vì danh sách chưa ký thay đổi sau mỗi đợt. Trong cùng lần chạy liên tục, các mã đã thao tác được loại khỏi các lần quét sau, kể cả khi API vẫn trả trạng thái `init`. Tool dừng khi hết hồ sơ mới, gặp lỗi, phiên đăng nhập hết hạn hoặc bạn bấm **Dừng sau hồ sơ này**. Nó không tự thử lại hồ sơ gặp lỗi. PIN chỉ giữ trong bộ nhớ suốt lần chạy và được xóa khi kết thúc. Chế độ nhập PIN thủ công vẫn cần bạn xử lý hộp thoại của từng hồ sơ.
+
+Thứ tự hiện theo API; chưa xác minh API sắp mới nhất trước và chưa có hợp đồng trường ngày tạo/tham số sắp xếp trong repository. Chỉ có thể coi đây là 100 hồ sơ mới nhất nếu API trả danh sách theo thứ tự đó. Luồng chia đợt đã được kiểm thử bằng dữ liệu giả 100 + 100 + 5 hồ sơ, chưa thử ký thật trên Windows/USB Token.
+
 **Dừng** có hiệu lực trước hồ sơ kế tiếp. Hồ sơ đang ở bước ký có thể tiếp tục để tránh bỏ dở. Khi lỗi hoặc trạng thái không rõ, danh sách dừng để bạn kiểm tra; tool không tự gửi lại lệnh ký hoặc thử lại PIN.
 
-Các tab hồ sơ được giữ mở để yêu cầu lưu/ký của website có thời gian hoàn tất và để bạn kiểm tra kết quả. Tool không tự đóng tab ngay sau khi gửi Complete. Nên ký từng nhóm nhỏ, kiểm tra rồi đóng các tab không cần nữa. Sau mỗi đợt, danh sách đã chọn bị xóa để tránh bấm ký lại; quét lại trước đợt tiếp theo. Không xử lý cùng các hồ sơ bằng tool khác trong lúc chạy.
+Các tab hồ sơ được giữ mở để yêu cầu lưu/ký của website có thời gian hoàn tất và để bạn kiểm tra kết quả. Tool không tự đóng tab ngay sau khi gửi Complete; chạy nhiều đợt có thể giữ nhiều tab và tốn bộ nhớ Chrome. Với chế độ ký hồ sơ đã chọn, danh sách đã chọn bị xóa sau khi kết thúc; quét lại trước đợt tiếp theo. Với chế độ liên tục, tool tự quét giữa các đợt và xóa danh sách hiển thị khi lần chạy kết thúc. Không xử lý cùng các hồ sơ bằng tool khác trong lúc chạy.
 
 Chế độ tự nhập PIN chỉ hỗ trợ các cửa sổ bảo mật/PIN đã nhận diện và chọn chứng thư khớp duy nhất. Nó gửi PIN một lần. Nếu nhà cung cấp USB dùng hộp thoại khác, hãy chuyển về nhập PIN thủ công; không tăng số lần thử vì USB có thể khóa sau nhiều lần nhập sai.
 

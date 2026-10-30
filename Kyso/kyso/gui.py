@@ -121,6 +121,10 @@ class SignerApp(ttk.Frame):
         self.sign_button.grid(row=0, column=3, padx=8)
         self.stop_button = ttk.Button(self.controls, text="Dừng sau hồ sơ này", command=self.stop, state="disabled")
         self.stop_button.grid(row=0, column=4)
+        self.continuous_button = ttk.Button(
+            self.controls, text="Ký liên tục từng đợt 100",
+            command=lambda: self.sign_selected(continuous=True))
+        self.continuous_button.grid(row=1, column=0, columnspan=3, sticky="w", pady=(8, 0))
 
         ttk.Label(self, textvariable=self.status, wraplength=980).grid(row=6, column=0, sticky="w", pady=(0, 8))
         log_frame = ttk.LabelFrame(self, text="Nhật ký phiên làm việc", padding=6)
@@ -213,6 +217,7 @@ class SignerApp(ttk.Frame):
         self.pin_entry.configure(state="normal" if not self.busy and self.automatic_pin.get() else "disabled")
         self.sign_button.configure(state="normal" if not self.busy and self.tree.selection() and not self.closing else "disabled")
         self.stop_button.configure(state="normal" if self.busy and self.signing and not self.stop_event.is_set() else "disabled")
+        self.continuous_button.configure(state=state)
 
     def _selection_changed(self):
         self.selection_summary.set(f"{len(self.records)} hồ sơ · {len(self.tree.selection())} đã chọn")
@@ -253,7 +258,7 @@ class SignerApp(ttk.Frame):
             return
         self._clear_records()
         self.stop_event.clear()
-        self._submit("Đang quét danh sách hồ sơ chưa ký…", lambda: self._ensure_browser().scan_pending(self.stop_event), self._set_records)
+        self._submit("Đang quét tối đa 100 hồ sơ chưa ký…", lambda: self._ensure_browser().scan_pending(self.stop_event, limit=100), self._set_records)
 
     def _set_records(self, records):
         self._clear_records()
@@ -294,11 +299,11 @@ class SignerApp(ttk.Frame):
             return
         self.status.set("Đã lưu lựa chọn chứng thư và chế độ nhập PIN. Không lưu PIN.")
 
-    def sign_selected(self):
+    def sign_selected(self, *, continuous=False):
         if self.busy:
             return
         records = [self.records[i] for i in self.tree.selection() if i in self.records]
-        if not records:
+        if not records and not continuous:
             return
         automatic = self.automatic_pin.get()
         certificate = self._certificate()
@@ -307,14 +312,22 @@ class SignerApp(ttk.Frame):
             messagebox.showwarning("Thiếu thông tin", "Chọn chứng thư và nhập PIN, hoặc tắt chế độ tự nhập PIN.", parent=self.root)
             return
         mode = "Tool sẽ tự chọn chứng thư và gửi PIN đúng một lần cho mỗi hồ sơ." if automatic else "Bạn tự chọn chứng thư/nhập PIN khi USB Token yêu cầu."
-        if not messagebox.askyesno("Xác nhận ký số", f"Bạn sắp gửi lệnh ký cho {len(records)} hồ sơ đã chọn.\n\n{mode}\n\nHãy kiểm tra đúng hồ sơ và chứng thư. Tiếp tục?", parent=self.root):
+        scope = (
+            "Quét tối đa 100 hồ sơ chưa ký theo thứ tự API, ký lần lượt, rồi tự quét đợt 100 tiếp theo. "
+            "Chạy đến khi hết hồ sơ mới, gặp lỗi hoặc bạn bấm Dừng. "
+            "Hồ sơ đã thao tác trong phiên sẽ không được ký lại."
+            if continuous else f"Bạn sắp gửi lệnh ký cho {len(records)} hồ sơ đã chọn.")
+        if not messagebox.askyesno("Xác nhận ký số", f"{scope}\n\n{mode}\n\nHãy kiểm tra đúng hồ sơ và chứng thư. Tiếp tục?", parent=self.root):
             return
         self.stop_event.clear()
         self.signing = True
         def work():
             browser = self._ensure_browser()
             token = AutomatedTokenPrompt(log=self.log) if automatic else ManualTokenPrompt(log=self.log)
-            return BatchSigner(browser, token, log=self.log).run(records, certificate=certificate, pin=pin, stop_event=self.stop_event)
+            signer = BatchSigner(browser, token, log=self.log)
+            if continuous:
+                return signer.run_pending(certificate=certificate, pin=pin, stop_event=self.stop_event)
+            return signer.run(records, certificate=certificate, pin=pin, stop_event=self.stop_event)
         self._submit("Đang thực hiện các bước ký…", work, self._signed)
 
     def _signed(self, result):

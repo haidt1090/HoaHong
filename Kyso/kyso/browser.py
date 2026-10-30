@@ -236,10 +236,14 @@ class ChromeSession:
         except Exception as exc:
             raise BrowserError("Không đọc được danh sách API đúng định dạng. Hãy kiểm tra phiên đăng nhập hoặc cập nhật bộ kết nối.") from exc
 
-    def scan_pending(self, stop_event=None) -> list[Record]:
+    def scan_pending(self, stop_event=None, *, limit: int | None = None,
+                     exclude_ids=()) -> list[Record]:
         """Read a bounded, deduplicated pending snapshot before any signing."""
+        if limit is not None and (type(limit) is not int or limit < 1):
+            raise ValueError("Giới hạn hồ sơ phải là số nguyên dương.")
         self._select_base()
         result: list[Record] = []
+        excluded = set(exclude_ids)
         seen: set[str] = set()
         expected_pages = None
         page = 1
@@ -269,9 +273,14 @@ class ChromeSession:
                 if identifier in seen:
                     continue
                 seen.add(identifier)
-                result.append(Record(identifier, full_name, status))
-                if len(result) > self.MAX_RECORDS:
+                if len(seen) > self.MAX_RECORDS:
                     raise BrowserError(f"Có hơn {self.MAX_RECORDS} hồ sơ. Hãy thu hẹp danh sách trước khi quét.")
+                if identifier in excluded:
+                    continue
+                result.append(Record(identifier, full_name, status))
+                if limit is not None and len(result) >= limit:
+                    self.log(f"Đã lấy đủ {limit} hồ sơ chờ ký cho đợt này.")
+                    return result
             self.log(f"Đã quét trang {page}/{max(pages, 1)}: {len(result)} hồ sơ chờ ký.")
             if page >= max(pages, 1):
                 return result

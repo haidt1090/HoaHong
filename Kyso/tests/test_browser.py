@@ -101,6 +101,30 @@ class BrowserTests(unittest.TestCase):
         browser, _ = self.session([page([], pages=0)])
         self.assertEqual(browser.scan_pending(), [])
 
+    def test_batch_limit_stops_at_100_without_fetching_later_pages(self):
+        browser, driver = self.session([
+            page([row(str(n)) for n in range(100)], pages=3),
+        ])
+        records = browser.scan_pending(limit=100)
+        self.assertEqual([r.check_up_id for r in records], [str(n) for n in range(100)])
+        self.assertEqual(len(driver.fetches), 1)
+
+    def test_next_batch_restarts_page_one_and_excludes_previous_ids(self):
+        browser, driver = self.session([
+            page([row("old"), row("new")], pages=2),
+            page([row("new"), row("next"), row("signed", status="signed")], pages=2),
+        ])
+        records = browser.scan_pending(limit=100, exclude_ids={"old"})
+        self.assertEqual([r.check_up_id for r in records], ["new", "next"])
+        self.assertIn("page_number=1", driver.fetches[0])
+
+    def test_invalid_batch_limit_is_rejected_before_fetch(self):
+        for limit in (0, -1, True, 1.5):
+            browser, driver = self.session()
+            with self.assertRaises(ValueError):
+                browser.scan_pending(limit=limit)
+            self.assertEqual(driver.fetches, [])
+
     def test_authentication_failure_is_not_empty_results(self):
         browser, _ = self.session([page([], status=401)])
         with self.assertRaisesRegex(BrowserError, "401"):

@@ -118,3 +118,51 @@ class BatchSigner:
                 self._log("Đã hoàn tất thao tác hiện tại và dừng theo yêu cầu.")
                 break
         return result
+
+    def run_pending(self, certificate: Any = None, pin: str = "",
+                    stop_event: Event | None = None) -> BatchResult:
+        """Rescan from page one after each batch; never retry an ID this session."""
+        from .browser import BrowserCancelled
+
+        stop_event = stop_event if stop_event is not None else Event()
+        total = BatchResult()
+        seen: set[str] = set()
+        batch_number = 0
+        while not stop_event.is_set():
+            try:
+                records = self._snapshot(self.browser.scan_pending(
+                    stop_event, limit=100, exclude_ids=seen))
+            except BrowserCancelled:
+                total.stopped = True
+                return total
+            except Exception as exc:
+                total.stopped = True
+                total.error = f"Dừng khi quét đợt tiếp theo ({type(exc).__name__}). Kiểm tra kết nối và quét lại thủ công."
+                self._log(total.error)
+                return total
+            if stop_event.is_set():
+                total.stopped = True
+                return total
+            if not records:
+                self._log("Không còn hồ sơ chờ ký mới trong phiên này.")
+                return total
+            if len(records) > 100 or any(r.check_up_id in seen for r in records):
+                total.stopped = True
+                total.error = "Danh sách đợt mới vượt 100 hoặc chứa hồ sơ đã thao tác. Dừng để kiểm tra; không tự ký lại."
+                self._log(total.error)
+                return total
+            batch_number += 1
+            self._log(f"Đợt {batch_number}: bắt đầu {len(records)} hồ sơ.")
+            result = self.run(records, certificate=certificate, pin=pin, stop_event=stop_event)
+            total.attempted += result.attempted
+            total.completed_steps += result.completed_steps
+            total.failed += result.failed
+            total.needs_review.extend(result.needs_review)
+            total.error = result.error
+            seen.update(r.check_up_id for r in records)
+            if result.stopped or result.failed or result.needs_review or result.error:
+                total.stopped = True
+                return total
+            self._log(f"Đợt {batch_number}: đã gửi Complete cho {result.completed_steps} hồ sơ; quét đợt tiếp theo.")
+        total.stopped = True
+        return total
