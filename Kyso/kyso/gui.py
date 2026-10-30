@@ -9,7 +9,7 @@ import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from .browser import ChromeSession
+from .browser import BulkRecord, ChromeSession
 from .settings import AppSettings, load_settings, save_settings
 from .windows import (
     AutomatedTokenPrompt, ManualTokenPrompt, launch_chrome, list_certificates,
@@ -73,7 +73,7 @@ class SignerApp(ttk.Frame):
         for column, (label, command) in enumerate([
             ("1. Mở Chrome", self.open_chrome),
             ("2. Kết nối", self.connect),
-            ("3. Quét hồ sơ", self.scan),
+            ("3. Quét thử 5 hồ sơ", self.scan),
             ("Lấy chứng thư USB", self.refresh_certificates),
             ("Lưu cài đặt", self.save),
         ]):
@@ -215,9 +215,13 @@ class SignerApp(ttk.Frame):
             button.configure(state=state)
         self.certificate_combo.configure(state="disabled" if self.busy else "readonly")
         self.pin_entry.configure(state="normal" if not self.busy and self.automatic_pin.get() else "disabled")
-        self.sign_button.configure(state="normal" if not self.busy and self.tree.selection() and not self.closing else "disabled")
+        signable = bool(self.tree.selection()) and all(
+            i in self.records and self.records[i].status == "init" for i in self.tree.selection())
+        self.sign_button.configure(state="normal" if not self.busy and signable and not self.closing else "disabled")
         self.stop_button.configure(state="normal" if self.busy and self.signing and not self.stop_event.is_set() else "disabled")
-        self.continuous_button.configure(state=state)
+        # Pause the previous API/detail-page flow while validating the site's
+        # actual Phiếu khám -> Hành động -> Ký nhiều file workflow with five rows.
+        self.continuous_button.configure(state="disabled")
 
     def _selection_changed(self):
         self.selection_summary.set(f"{len(self.records)} hồ sơ · {len(self.tree.selection())} đã chọn")
@@ -258,16 +262,19 @@ class SignerApp(ttk.Frame):
             return
         self._clear_records()
         self.stop_event.clear()
-        self._submit("Đang quét tối đa 100 hồ sơ chưa ký…", lambda: self._ensure_browser().scan_pending(self.stop_event, limit=100), self._set_records)
+        self._submit("Đang mở Ký nhiều file và đọc thử 5 hồ sơ chưa ký…", lambda: self._ensure_browser().scan_list_preview(self.stop_event), self._set_records)
 
     def _set_records(self, records):
         self._clear_records()
         for index, record in enumerate(records):
             iid = f"record-{index}"
             self.records[iid] = record
-            self.tree.insert("", "end", iid=iid, values=(record.check_up_id, record.full_name, record.status))
+            self.tree.insert("", "end", iid=iid, values=(("STT " + record.row_number) if isinstance(record, BulkRecord) else record.check_up_id, record.full_name, record.status))
         self._selection_changed()
-        self.status.set(f"Tìm thấy {len(self.records)} hồ sơ chưa ký. Chọn hồ sơ cần ký; danh sách là ảnh chụp tại thời điểm quét.")
+        if any(record.status != "init" for record in records):
+            self.status.set(f"Đã đọc thử {len(self.records)} hồ sơ theo thứ tự bảng hiện tại. Trạng thái hiển thị Chưa ký số; chưa chọn phiếu hoặc gửi lệnh ký.")
+        else:
+            self.status.set(f"Tìm thấy {len(self.records)} hồ sơ chưa ký. Chọn hồ sơ cần ký; danh sách là ảnh chụp tại thời điểm quét.")
 
     def refresh_certificates(self):
         self._submit("Đang lấy chứng thư có khóa riêng trên Windows…", list_certificates, self._set_certificates)
@@ -302,7 +309,13 @@ class SignerApp(ttk.Frame):
     def sign_selected(self, *, continuous=False):
         if self.busy:
             return
+        if continuous:
+            messagebox.showinfo("Đang kiểm tra luồng ký", "Tạm dừng ký 100 hồ sơ. Quét thử 5 hồ sơ và kiểm tra màn hình Ký nhiều file trước.", parent=self.root)
+            return
         records = [self.records[i] for i in self.tree.selection() if i in self.records]
+        if any(record.status != "init" for record in records):
+            messagebox.showinfo("Quét thử", "Danh sách này chỉ để đối chiếu 5 hồ sơ. Chưa xác minh trạng thái hoặc luồng Ký nhiều file; chưa gửi lệnh ký.", parent=self.root)
+            return
         if not records and not continuous:
             return
         automatic = self.automatic_pin.get()

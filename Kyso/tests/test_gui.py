@@ -110,7 +110,7 @@ class GuiTests(unittest.TestCase):
         self.app._set_records([Record("old")])
         self.app.tree.selection_set("record-0")
         browser = Mock()
-        browser.scan_pending.side_effect = RuntimeError("fixture failure")
+        browser.scan_list_preview.side_effect = RuntimeError("fixture failure")
         with patch.object(self.app, "_ensure_browser", return_value=browser), patch("kyso.gui.messagebox.showerror"):
             self.app.scan()
             self.drain()

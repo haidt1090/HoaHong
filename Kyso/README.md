@@ -1,5 +1,13 @@
 # KySoPython
 
+## Chế độ kiểm tra hiện tại: đọc thử 5 hồ sơ từ Phiếu khám
+
+Theo màn hình thực tế, luồng cần đối chiếu là **Phiếu khám → Hành động → Ký nhiều file**. Nút **Quét thử 5 hồ sơ** mở **Hành động → Ký nhiều file** nếu cần, rồi đọc tối đa 5 dòng có checkbox khả dụng và trạng thái **Chưa ký số** trên trang hiện tại của cửa sổ chọn phiếu. Không gọi API cũ, không chuyển trang, không mở trang chi tiết và không gửi lệnh ký. Chọn đúng tab Phiếu khám trong Chrome trước khi quét. Nếu không có bảng phù hợp, tool báo lỗi thay vì dùng API thay thế. Dùng STT và thông tin hiển thị để đối chiếu, không suy đoán mã hồ sơ từ STT hoặc số định danh đã che.
+
+Trạng thái các dòng đọc thử lấy từ cột **Trạng thái** của cửa sổ; đây chưa phải xác minh chữ ký. Chưa tự tích checkbox, bấm **Chọn phiếu**, **Ký số** hoặc đặt chữ ký trên PDF. Nút ký cho các dòng đọc thử và ký liên tục 100 tạm dừng trong giao diện trong lúc đối chiếu luồng thực tế. Phần hướng dẫn ký dưới đây mô tả luồng cũ, chưa xác minh phù hợp với màn hình mới.
+
+**Cảnh báo phân phối:** ZIP tại commit `499470d` bị Windows Defender phát hiện `Trojan:Script/Sabsik.FL.A!ml`. Chưa có kết luận phân tích độc lập. Thay đổi bước quét không giải quyết cảnh báo này; không tắt Defender hoặc khôi phục file bị chặn để thử bản sửa. Chưa tạo ZIP thay thế hoặc xác nhận bản mới sạch.
+
 Ứng dụng desktop Python/Tkinter hỗ trợ ký hồ sơ trên **https://admin.csdlksk.vn** theo thứ tự thao tác của tool gốc: mở hồ sơ → mở PDF → chọn chữ ký → tạo chữ ký mới → Save signature → Sign with USB Token → xử lý chứng thư/PIN → chờ Complete → gửi Complete.
 
 Bản này có mã nguồn, bộ chạy và cấu hình đóng gói EXE. Phần ký trên website thật, hộp thoại USB Token và EXE **chưa được kiểm chứng trên máy Windows có USB ký số**. Selector của website hoặc hộp thoại nhà cung cấp có thể cần điều chỉnh sau lần thử thực tế. Chỉ dùng hồ sơ đã kiểm tra và bạn có quyền ký; nên thử một hồ sơ trước khi chạy một danh sách.

@@ -40,6 +40,7 @@ class FakeDriver:
         self.closed = []
         self.visits = []
         self.fetches = []
+        self.visible_rows = []
         self.elements = []
         self.service = Mock()
         self.command_executor = Mock()
@@ -63,6 +64,10 @@ class FakeDriver:
         self.fetches.append(path)
         return next(self.results)
 
+    def execute_script(self, script):
+        self.read_script = script
+        return self.visible_rows
+
     def get(self, url):
         self.urls[self.current_window_handle] = url
         self.visits.append(url)
@@ -82,6 +87,78 @@ class BrowserTests(unittest.TestCase):
         browser = ChromeSession(driver=driver)
         browser.connect()
         return browser, driver
+
+    @staticmethod
+    def bulk_row(number=1, status="Chưa ký số", selectable=True):
+        return {"row_number": str(number), "name": f"Synthetic {number}",
+                "masked_identifier": f"000*****{number:03d}",
+                "status": status, "selectable": selectable}
+
+    def test_preview_reads_first_five_pending_checkbox_rows_without_api_or_navigation(self):
+        browser, driver = self.session()
+        driver.visible_rows = [self.bulk_row(n) for n in range(1, 9)]
+        browser.click_text = Mock()
+        records = browser.scan_list_preview()
+        self.assertEqual([r.row_number for r in records], [str(n) for n in range(1, 6)])
+        self.assertTrue(all(r.status == "Chưa ký số" for r in records))
+        self.assertEqual(driver.fetches, [])
+        self.assertEqual(driver.visits, [])
+        browser.click_text.assert_not_called()
+        from kyso.workflow import BatchSigner
+        token = Mock()
+        with self.assertRaises(ValueError):
+            BatchSigner(browser, token).run(records)
+        token.handle.assert_not_called()
+
+    def test_preview_opens_action_menu_then_bulk_picker_only(self):
+        browser, driver = self.session()
+        driver.execute_script = Mock(side_effect=[None, [self.bulk_row()]])
+        browser.click_text = Mock()
+        records = browser.scan_list_preview()
+        self.assertEqual([call.args[0] for call in browser.click_text.call_args_list],
+                         ["Hành động", "Ký nhiều file"])
+        self.assertEqual(len(records), 1)
+        self.assertEqual(driver.visits, [])
+        self.assertEqual(driver.fetches, [])
+
+    def test_preview_ignores_signed_and_disabled_rows(self):
+        browser, driver = self.session()
+        driver.visible_rows = [self.bulk_row(1, status="Đã ký số"),
+                               self.bulk_row(2, selectable=False), self.bulk_row(3)]
+        self.assertEqual([r.row_number for r in browser.scan_list_preview()], ["3"])
+
+    def test_preview_rejects_malformed_or_duplicate_rows(self):
+        for rows in ([], [self.bulk_row(), self.bulk_row()], [{"name": "missing status"}]):
+            browser, driver = self.session()
+            driver.visible_rows = rows
+            with self.assertRaises(BrowserError):
+                browser.scan_list_preview()
+            self.assertEqual(driver.fetches, [])
+
+    def test_preview_rejects_ambiguous_list_tabs_without_navigating(self):
+        browser, driver = self.session()
+        driver.urls["second"] = driver.urls["system"] + "?page=2"
+        driver.switch_to.window("other")
+        with self.assertRaisesRegex(BrowserError, "đúng tab"):
+            browser.scan_list_preview()
+        self.assertEqual(driver.current_window_handle, "other")
+        self.assertEqual(driver.visits, [])
+
+    def test_preview_prefers_selected_list_tab_over_previous_base(self):
+        browser, driver = self.session()
+        driver.urls["selected"] = driver.urls["system"] + "?page=2"
+        driver.switch_to.window("selected")
+        driver.visible_rows = [self.bulk_row()]
+        self.assertEqual(len(browser.scan_list_preview()), 1)
+        self.assertEqual(driver.current_window_handle, "selected")
+
+    def test_preview_cancelled_before_read(self):
+        browser, driver = self.session()
+        stop = threading.Event()
+        stop.set()
+        with self.assertRaises(BrowserCancelled):
+            browser.scan_list_preview(stop)
+        self.assertFalse(hasattr(driver, "read_script"))
 
     def test_scan_snapshot_across_pages_and_deduplicates(self):
         browser, driver = self.session([

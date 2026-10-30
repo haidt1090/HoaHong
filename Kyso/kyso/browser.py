@@ -29,6 +29,15 @@ class Record:
     status: str = "init"
 
 
+@dataclass(frozen=True)
+class BulkRecord:
+    """A displayed bulk-sign row, not an API record or a guessed document ID."""
+    row_number: str
+    full_name: str
+    masked_identifier: str
+    status: str
+
+
 def xpath_literal(value: str) -> str:
     """Quote arbitrary text as an XPath 1.0 string literal."""
     if "'" not in value:
@@ -67,6 +76,30 @@ fetch(arguments[0], {method: 'GET', credentials: 'include',
 .finally(() => clearTimeout(timer));
 """
 
+
+_VISIBLE_RECORDS_SCRIPT = """
+// Read only the bulk-selection table: no checkbox click, request or submission.
+const visible = element => element.getClientRects().length > 0;
+const normalize = text => text.trim().replace(/\\s+/g, ' ').toLocaleLowerCase('vi');
+const tables = [...document.querySelectorAll('table')].filter(table => {
+    const headers = [...table.querySelectorAll('thead th')].map(th => normalize(th.textContent));
+    return visible(table) && ['stt', 'họ và tên', 'trạng thái'].every(h => headers.includes(h))
+        && [...table.querySelectorAll('tbody input[type="checkbox"], tbody [role="checkbox"]')].some(visible);
+});
+if (tables.length !== 1) return null;
+const table = tables[0];
+const headers = [...table.querySelectorAll('thead th')].map(th => normalize(th.textContent));
+return [...table.querySelectorAll('tbody tr')].filter(visible).map(row => {
+    const cells = [...row.querySelectorAll('td')];
+    const read = heading => cells[headers.indexOf(heading)]?.textContent.trim() || '';
+    const checks = [...row.querySelectorAll('input[type="checkbox"], [role="checkbox"]')].filter(visible);
+    return {
+        row_number: read('stt'), name: read('họ và tên'),
+        masked_identifier: read('số định danh cá nhân'), status: read('trạng thái'),
+        selectable: checks.length === 1 && !checks[0].disabled && checks[0].getAttribute('aria-disabled') !== 'true'
+    };
+});
+"""
 
 class ChromeSession:
     MAX_PAGES = 1000
@@ -286,6 +319,85 @@ class ChromeSession:
                 return result
             page += 1
 
+    def scan_list_preview(self, stop_event=None) -> list[BulkRecord]:
+        """Open Hành động -> Ký nhiều file and read five pending checkbox rows.
+
+        Only opens the selector. Does not select records or send signing commands.
+        """
+        driver = self._require_connected()
+        _cancelled(stop_event)
+        # Prefer the selected tab. Never pick a different list when several
+        # tabs may have different filters, and never navigate to guessed IDs.
+        handles = [driver.current_window_handle] + [
+            h for h in driver.window_handles if h != driver.current_window_handle]
+        matches = []
+        original = driver.current_window_handle
+        for handle in handles:
+            _cancelled(stop_event)
+            driver.switch_to.window(handle)
+            try:
+                url = urlsplit(driver.current_url)
+                is_list = (_origin(driver.current_url) == self.origin and
+                           url.path.rstrip('/') == '/admin/operation/health-checkup')
+            except BrowserError:
+                is_list = False
+            if is_list:
+                matches.append(handle)
+                if handle == original:
+                    break
+        if len(matches) != 1:
+            if original in driver.window_handles:
+                driver.switch_to.window(original)
+            raise BrowserError("Hãy chọn đúng tab danh sách Phiếu khám cần quét thử rồi kết nối lại.")
+        driver.switch_to.window(matches[0])
+        self._ensure_site()
+        rows = driver.execute_script(_VISIBLE_RECORDS_SCRIPT)
+        if rows is None:
+            _cancelled(stop_event)
+            self.click_text("Hành động")
+            _cancelled(stop_event)
+            self.click_text("Ký nhiều file")
+            deadline = time.monotonic() + 15
+            while rows is None:
+                _cancelled(stop_event)
+                self._ensure_site()
+                rows = driver.execute_script(_VISIBLE_RECORDS_SCRIPT)
+                if rows is not None:
+                    break
+                if time.monotonic() >= deadline:
+                    raise BrowserError("Chưa nhận diện được bảng chọn hồ sơ trong Ký nhiều file. Không gọi API thay thế.")
+                if stop_event is not None:
+                    stop_event.wait(0.2)
+                else:
+                    time.sleep(0.2)
+        if not isinstance(rows, list):
+            raise BrowserError("Không đọc được bảng chọn hồ sơ Ký nhiều file.")
+        result = []
+        seen = set()
+        for row in rows:
+            _cancelled(stop_event)
+            fields = ('row_number', 'name', 'masked_identifier', 'status')
+            if not isinstance(row, dict) or any(not isinstance(row.get(key), str) for key in fields):
+                raise BrowserError("Dòng hồ sơ trong Ký nhiều file không đúng định dạng.")
+            if ' '.join(row['status'].split()).casefold() != 'chưa ký số':
+                continue
+            if row.get('selectable') is not True:
+                continue
+            number, name, identifier = (row[key].strip() for key in fields[:3])
+            if not number.isascii() or not number.isdigit() or not name or not identifier:
+                raise BrowserError("Dòng hồ sơ thiếu STT, họ tên hoặc số định danh hiển thị.")
+            if number in seen:
+                raise BrowserError("Bảng có STT trùng; dừng để tránh đọc nhầm dòng.")
+            seen.add(number)
+            result.append(BulkRecord(number, name, identifier, 'Chưa ký số'))
+            if len(result) == 5:
+                break
+        if not result:
+            raise BrowserError("Không thấy hồ sơ Chưa ký số có thể chọn trên trang hiện tại.")
+        self._base_handle = matches[0]
+        self.log(f"Đã đọc thử {len(result)} hồ sơ Chưa ký số từ Ký nhiều file; chưa chọn phiếu hoặc gửi lệnh ký.")
+        return result
+
     @contextmanager
     def open_record(self, record: Record) -> Iterator[None]:
         driver = self._require_connected()
@@ -404,7 +516,7 @@ class ChromeSession:
 
     def click_text(self, text: str, timeout: float = 30) -> None:
         literal = xpath_literal(text)
-        selector = ("//*[self::a or self::button or @role='button' or self::input]"
+        selector = ("//*[self::a or self::button or @role='button' or @role='menuitem' or self::input]"
                     f"[normalize-space(.)={literal} or @aria-label={literal} or @value={literal}]")
         element = self._find_clickable("xpath", selector, timeout)
         try:
