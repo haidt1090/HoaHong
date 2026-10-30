@@ -89,6 +89,10 @@ Các test dùng bộ giả lập browser/hộp thoại để kiểm tra phân tr
 - `kyso/settings.py`: cấu hình cục bộ.
 - `scripts/windows_env.py`: cài, chạy và build trong môi trường Python riêng.
 
+## Mở hồ sơ nhưng dừng ở form trống hoặc trước màn hình PDF
+
+Tool chờ ô họ tên trên trang chi tiết có dữ liệu khớp tên lúc quét, sau đó bấm đúng **Ký phiếu khám**. Không dùng nút `submit` chung vì có thể bấm nhầm **Lưu thông tin** và kích hoạt lỗi bắt buộc nhập trên form. Nếu trang trống, sai người hoặc không có ô họ tên nhận diện được sau 30 giây, tool dừng trước khi mở ký. Kiểm tra đường dẫn hồ sơ, phiên đăng nhập và dữ liệu tải từ cổng; không nhập hoặc lưu dữ liệu giả để vượt qua lỗi.
+
 ## Nếu cài xong nhưng không mở được
 
 Bản sửa bộ chạy nhận cả Python 3.15. Khi bị lỗi, cửa sổ lệnh được giữ mở và log nằm tại `%LOCALAPPDATA%\KySoPython\diagnostics\last-launch.log`. Gửi thông báo lỗi hoặc file log này để xác định nguyên nhân trên máy của bạn. Bộ chạy không lưu PIN trong log.

@@ -302,6 +302,37 @@ class BrowserTests(unittest.TestCase):
         self.assertIn("self::a", driver.last_selector[1])
         element.click.assert_called_once()
 
+    def test_patient_form_must_match_scanned_name_before_signing(self):
+        browser, driver = self.session()
+        field = Mock()
+        field.is_displayed.return_value = True
+        values = {"placeholder": "NHẬP HỌ TÊN", "value": "  Nguyễn   Văn A "}
+        field.get_attribute.side_effect = values.get
+        driver.elements = [field]
+        browser.wait_record_loaded(Record("a", "NGUYỄN VĂN A"), timeout=0)
+        field.click.assert_not_called()
+        for value in ("", "Nguyễn Văn B"):
+            values["value"] = value
+            with self.subTest(value=value), self.assertRaisesRegex(BrowserError, "chưa tải đúng"):
+                browser.wait_record_loaded(Record("a", "Nguyễn Văn A"), timeout=0)
+
+    def test_missing_or_ambiguous_patient_form_is_rejected(self):
+        browser, driver = self.session()
+        field = Mock()
+        field.is_displayed.return_value = True
+        field.get_attribute.side_effect = {"placeholder": "NHẬP HỌ TÊN", "value": "Test"}.get
+        for fields in ([], [field, field]):
+            driver.elements = fields
+            with self.assertRaises(BrowserError):
+                browser.wait_record_loaded(Record("a", "Test"), timeout=0)
+
+    def test_cancel_before_patient_data_check(self):
+        browser, driver = self.session()
+        stop = threading.Event()
+        stop.set()
+        with self.assertRaises(BrowserCancelled):
+            browser.wait_record_loaded(Record("a", "Test"), stop_event=stop)
+
     def test_ambiguous_buttons_are_not_clicked(self):
         browser, driver = self.session()
         buttons = [Mock(), Mock()]

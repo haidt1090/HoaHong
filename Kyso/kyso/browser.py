@@ -375,6 +375,33 @@ class ChromeSession:
         except Exception as exc:
             raise BrowserError("Không bấm được nút trên trang. Kiểm tra hộp thoại hoặc lớp phủ.") from exc
 
+    def wait_record_loaded(self, record: Record, timeout: float = 30,
+                           stop_event=None) -> None:
+        """Do not open signing on an empty or mismatched patient form."""
+        end = time.monotonic() + timeout
+        normalize = lambda value: " ".join(value.split()).casefold()
+        expected = normalize(record.full_name)
+        while True:
+            _cancelled(stop_event)
+            self._ensure_site()
+            try:
+                fields = [element for element in self.driver.find_elements("css selector", "input[placeholder]")
+                          if normalize(element.get_attribute("placeholder") or "")
+                          in ("nhập họ tên", "nhập họ và tên") and element.is_displayed()]
+                if len(fields) == 1:
+                    actual = normalize(fields[0].get_attribute("value") or "")
+                    if actual and (not expected or actual == expected):
+                        return
+            except Exception as exc:
+                if exc.__class__.__name__ != "StaleElementReferenceException":
+                    raise BrowserError("Không kiểm tra được dữ liệu hồ sơ; dừng trước khi mở ký.") from exc
+            if time.monotonic() >= end:
+                raise BrowserError("Hồ sơ chưa tải đúng họ tên đã quét. Không bấm Lưu thông tin hoặc ký; kiểm tra trang hồ sơ.")
+            if stop_event is not None:
+                stop_event.wait(0.2)
+            else:
+                time.sleep(0.2)
+
     def click_text(self, text: str, timeout: float = 30) -> None:
         literal = xpath_literal(text)
         selector = ("//*[self::a or self::button or @role='button' or self::input]"

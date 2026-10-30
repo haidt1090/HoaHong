@@ -75,11 +75,13 @@ class BatchSigner:
             stage = "mở tab hồ sơ"
             try:
                 with self.browser.open_record(record):
+                    stage = "chờ dữ liệu người khám khớp hồ sơ đã quét"
+                    self.browser.wait_record_loaded(record, stop_event=stop_event)
                     # Mark uncertain *before* dispatch: a driver exception may
                     # arrive after the click was received by the application.
                     issued_command = True
-                    stage = "mở tài liệu bằng nút submit"
-                    self.browser.click_css('button[type="submit"]')
+                    stage = "mở tài liệu bằng nút Ký phiếu khám"
+                    self.browser.click_text("Ký phiếu khám")
                     stage = "chọn vị trí chữ ký trên PDF"
                     self.browser.click_css(
                         'button[aria-label="Chọn chữ ký để đặt vào PDF"]')

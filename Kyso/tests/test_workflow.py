@@ -34,6 +34,9 @@ class FakeBrowser:
     def click_css(self, selector):
         self._click("css", selector)
 
+    def wait_record_loaded(self, record, stop_event=None):
+        pass
+
     def click_text(self, text):
         self._click("text", text)
         if text == "Sign with USB Token" and self.after_security:
@@ -64,6 +67,16 @@ class FakeToken:
 
 
 class BatchSignerTests(unittest.TestCase):
+    def test_unloaded_patient_form_never_clicks_or_calls_token(self):
+        browser, token = FakeBrowser(), FakeToken()
+        browser.wait_record_loaded = Mock(side_effect=RuntimeError("Empty form"))
+        result = BatchSigner(browser, token).run([Record("a")])
+        self.assertEqual(browser.calls, [("open", "a"), ("close", "a")])
+        self.assertEqual(token.calls, [])
+        self.assertEqual(result.failed, 1)
+        self.assertTrue(result.stopped)
+        self.assertEqual(result.needs_review, [])
+
     def test_continuous_batches_100_100_5_then_empty_without_retries(self):
         browser = FakeBrowser()
         batches = [[Record(str(n)) for n in range(start, end)]
@@ -150,7 +163,7 @@ class BatchSignerTests(unittest.TestCase):
         self.assertEqual(result.needs_review, [])
         self.assertEqual(browser.calls[:9], [
             ("open", "a"),
-            ("css", 'button[type="submit"]'),
+            ("text", "Ký phiếu khám"),
             ("css", 'button[aria-label="Chọn chữ ký để đặt vào PDF"]'),
             ("text", "Tạo chữ ký mới"), ("text", "Save signature"),
             ("text", "Sign with USB Token"), ("wait", 120),

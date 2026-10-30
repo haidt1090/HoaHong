@@ -60,9 +60,12 @@ class LocalBrowserSmoke(unittest.TestCase):
                     # Every transition exposes exactly one actionable control.
                     # The anchor is intentional: the original app can use links.
                     self.send("""<!doctype html><html><meta charset="utf-8"><body>
-<div id="stage"><button type="submit" onclick="next(2)">Mở hồ sơ</button></div>
+<input placeholder="NHẬP HỌ TÊN" id="patient-name">
+<button type="submit" onclick="throw new Error('Must not save the patient form')">Lưu thông tin</button>
+<div id="stage"><button type="button" onclick="next(2)">Ký phiếu khám</button></div>
 <script>
 const id = RECORD_ID;
+document.getElementById('patient-name').value = 'Synthetic ' + id.split('-').pop();
 function next(n) {
  const stage = document.getElementById('stage');
  if (n === 2) stage.innerHTML = '<button aria-label="Chọn chữ ký để đặt vào PDF" onclick="next(3)">Đặt chữ ký</button>';
