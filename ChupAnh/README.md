@@ -1,32 +1,53 @@
-# Sửa lỗi 1.2.1: ảnh bị kẹt trong hàng đợi
-
-- Khởi động sẽ chuyển trạng thái chờ/gửi còn sót từ lần chạy trước sang cần kiểm tra,
-  không khóa ảnh vĩnh viễn và không tự in lại tác vụ chưa rõ kết quả.
-- In tay cho phép in lại sau khi kiểm tra hàng đợi Windows và xác nhận.
-- Nếu một số ảnh trong lô đang thực sự được xử lý, bỏ qua chúng và tiếp tục xếp các ảnh khác.
-- Bấm in lại ảnh đang xử lý không còn hiện hộp thoại lỗi chặn thao tác.
-- Chỉ cho mở một phiên ứng dụng để tránh hai bản tranh nhận bot và ghi trạng thái in.
-
-Thoát bản cũ, giải nén bản mới, chạy MO_UNG_DUNG.bat. Không cần xóa lịch sử hoặc token.
-Nếu trước đó đã có lệnh gửi máy in, kiểm tra hàng đợi Windows trước khi in lại bằng tay.
-
----
-
-# ChupAnh — Telegram Photo Print 1.2 cho Windows
+# ChupAnh — Telegram Photo Print 1.3 cho Windows
 
 Nhận ảnh bằng Bot hoặc tài khoản Telegram qua API, không auto click.
 Hiển thị ảnh thu nhỏ, chọn nhiều ảnh để in hàng loạt, tự động in ảnh mới,
 lưu kết nối và cài đặt in. Giấy A4/A5/A6, ảnh 3×4 hoặc 4×6 cm,
 1–999 bản mỗi ảnh, chọn máy in Windows, xem trước và xuất PDF.
 
+## Mới ở bản 1.3: in tay, PDF và hàng đợi Windows
+
+- Tắt tự động vẫn chọn ảnh đã in để in lại bằng tay được; lịch sử không khóa in tay.
+- Chọn **Microsoft Print to PDF** hoặc **Xuất PDF trực tiếp**, bấm **In ảnh đã chọn**:
+  chọn nơi lưu bằng hộp thoại của phần mềm, không gọi hộp thoại Save Print Output As của driver.
+- Hủy hộp thoại lưu PDF không tạo lệnh in hoặc khóa ảnh. PDF lỗi/hủy giữ nguyên tệp đích cũ.
+- Nút **Xuất PDF ảnh đã chọn** dùng cùng cơ chế xuất trực tiếp. Tự động PDF lưu vào
+  **Thư mục PDF tự động**, không hỏi tên tệp từng ảnh.
+- Bảng tiến độ cho từng lượt: tên ảnh đang xử lý, số bản đã xử lý, trạng thái và đích in/PDF.
+- **Tạm dừng / Tiếp tục** áp dụng cho hàng đợi phần mềm và gửi PAUSE/RESUME đến các lệnh
+  Windows đã nhận diện của ứng dụng.
+- Chọn một dòng, bấm **Hủy lệnh đã chọn**: hủy tác vụ chưa gửi, dừng PDF đang tạo,
+  hoặc gửi `SetJob(JOB_CONTROL_DELETE)` tới đúng mã lệnh trong Windows Print Spooler.
+  Không dùng PurgePrinter và không xóa tác vụ của chương trình khác.
+- **Mở hàng đợi Windows** mở cửa sổ queue của máy in ở dòng đang chọn.
+- **Xóa tiến độ đã xong** chỉ xóa dòng lịch sử đã kết thúc; không xóa ảnh,
+  không xóa lịch sử chống in trùng và không giấu tác vụ còn treo trong Windows.
+- Nhớ mã lệnh và tên tài liệu riêng để mở lại vẫn theo dõi/hủy được tác vụ của bản này.
+
+### Hiểu đúng trạng thái
+
+**Đã xử lý ảnh** là tiến độ ghép ảnh và gửi dữ liệu. Nếu lệnh vẫn xuất hiện trong Windows,
+phần mềm tiếp tục báo **chưa hoàn tất**, kể cả máy in Offline, hết giấy hoặc lỗi.
+Chỉ khi truy vấn thành công và không còn lệnh tương ứng mới báo **Không còn trong hàng đợi Windows**.
+Nếu truy vấn hoặc quyền điều khiển thất bại, báo lỗi và giữ trạng thái chưa xác minh.
+Windows không luôn xác nhận được giấy đã ra; dữ liệu đã nằm trong bộ nhớ máy in
+có thể vẫn ra giấy sau yêu cầu hủy. Theo dõi số trang Windows báo nếu driver hỗ trợ.
+
+Tạm dừng/hủy diễn ra giữa các ảnh; nếu driver đang mở hộp thoại riêng, có thể cần đóng hộp thoại đó.
+Lệnh cũ từ bản 1.2 chưa có mã theo dõi không tự được nhập vào bảng: dùng hàng đợi Windows để kiểm tra/hủy chúng.
+
+Bộ điều khiển Windows cần `pywin32`: **phải chạy lại CAI_DAT.bat khi nâng cấp**.
+Nếu thiếu thư viện hoặc chưa xác minh được queue, phần mềm không báo đã in hoàn tất.
+Các thao tác Windows cần quyền truy cập lệnh in tương ứng; lỗi quyền được hiển thị.
+
 ## Cài đặt / nâng cấp
 1. Cài Python 3.11+ từ python.org, chọn Add Python to PATH.
 2. Thoát hẳn bản cũ; chỉ chạy một ứng dụng nhận cùng một bot.
 3. Giải nén toàn bộ gói mới vào thư mục có quyền ghi.
 4. Chạy `CAI_DAT.bat` một lần, kể cả khi nâng cấp (bản mới dùng thêm keyring).
-5. Chạy `MO_UNG_DUNG.bat`. Tiêu đề phải có số **1.2**.
+5. Chạy `MO_UNG_DUNG.bat`. Tiêu đề phải có số **1.3**.
 6. Cài driver máy in thật trên Windows trước khi in ra giấy. OneNote và các máy in PDF
-   là máy in ảo, có thể mở hộp thoại riêng của driver.
+   là máy in ảo. Với Microsoft Print to PDF, phần mềm chuyển sang xuất PDF trực tiếp để tránh hộp thoại driver bị treo.
 
 ## Kết nối Bot
 1. Tạo bot ở @BotFather, lấy token và nhập vào ứng dụng. Không gửi token vào chat hỗ trợ.
@@ -79,7 +100,7 @@ Một nguồn Telegram kết nối tại một thời điểm; ngắt trước k
 
 Bật tự động không in lại thư viện cũ hoặc ảnh đã có sẵn trong thư mục.
 Thay đổi thông số chỉ tác động đến tác vụ tiếp theo; tác vụ đã xếp hàng giữ cấu hình lúc nhận.
-Tắt tự động sẽ bỏ các tác vụ tự động chưa bắt đầu; tác vụ đã gửi máy in phải hủy ở hàng đợi Windows.
+Tắt tự động sẽ bỏ các tác vụ tự động chưa bắt đầu. Tác vụ đã gửi Windows có thể hủy bằng nút Hủy lệnh đã chọn hoặc ở hàng đợi Windows.
 Nếu máy in đã lưu không còn khả dụng, chọn lại máy in trước khi bật tự động.
 
 Lề 7 mm, khoảng cách 3 mm. Giữ toàn bộ ảnh, không cắt; có thể có viền trắng nếu khác tỷ lệ khung.
@@ -87,6 +108,7 @@ Driver có thể co giãn hoặc thay khổ; kiểm tra bằng thước trên b�
 Chống tải trùng theo tài khoản/nhóm/tin nhắn, chống tự in trùng theo SHA-256 của nội dung.
 In tay vẫn có thể in lại theo hộp xác nhận. Gửi máy in chưa có nghĩa giấy đã ra.
 Lỗi in sẽ dừng tự động, đánh dấu cần kiểm tra và không tự in lại để tránh ra giấy hai lần.
+Trạng thái chờ bị sót sau gián đoạn được đưa về cần kiểm tra, không khóa in tay vĩnh viễn.
 
 ## Thư mục ảnh bổ sung
 Chọn thư mục ảnh thường trên Windows, tùy chọn đọc thư mục con.
@@ -114,6 +136,8 @@ Bot tự thử lại lỗi mạng; tài khoản dùng khả năng kết nối l�
 Chạy `.venv\Scripts\python -m unittest discover -v`.
 Có kiểm tra tự động cho lưu/khôi phục kết nối, đóng cửa sổ vẫn nhận ảnh, lọc nhóm,
 chống trùng, tự in không hỏi xác nhận, in nhiều ảnh, lưu cài đặt, thư viện,
-bố trí kích thước và kết xuất PDF bằng luồng in thực.
+bố trí kích thước và kết xuất PDF bằng luồng in thực. Có kiểm tra toàn luồng nút In ảnh đã chọn
+→ xuất PDF, hủy lưu rồi thử lại, in tay lại ảnh cũ, pause/resume/cancel, và mô phỏng Windows
+Offline, SetJob, lỗi quyền, lỗi đọc queue, khôi phục mã lệnh sau khởi động lại.
 Chưa kiểm chứng bằng bot/tài khoản và máy in Windows thật trong môi trường phát triển.
 Đây là mã nguồn Python kèm tệp .bat, chưa phải bộ cài .exe.

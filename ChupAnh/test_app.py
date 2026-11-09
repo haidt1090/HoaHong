@@ -1,4 +1,8 @@
-import os,tempfile,unittest
+import os,tempfile,unittest,time
+from concurrent.futures import Future
+import printing
+from spooler import WindowsSpooler
+from test_spooler import FakeAPI
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -12,10 +16,21 @@ from connection_store import ConnectionStore
 from test_connection import Vault
 
 class FakePrintWorker(QObject):
-    finished=Signal()
+    finished=Signal(); progress=Signal(int,int,str); spool_job=Signal(int)
     def __init__(self,paths,settings,parent=None):
-        super().__init__(parent); self.paths=list(paths); self.settings=dict(settings); self.error=None; self.started=False
+        super().__init__(parent); self.paths=list(paths); self.settings=dict(settings); self.error=None; self.started=False; self.cancelled=False; self.paused=False
     def start(self): self.started=True
+    def pause(self): self.paused=True
+    def resume(self): self.paused=False
+    def cancel(self): self.cancelled=True
+
+class ImmediatePool:
+    def submit(self,fn,*args):
+        future=Future()
+        try: future.set_result(fn(*args))
+        except Exception as exc: future.set_exception(exc)
+        return future
+    def shutdown(self,*args,**kwargs): pass
 
 class AppTests(unittest.TestCase):
     @classmethod
@@ -25,11 +40,12 @@ class AppTests(unittest.TestCase):
         self.patches=[patch.object(application,'BASE',self.base),
             patch('telegram_ui.ConnectionStore',side_effect=lambda base:ConnectionStore(base,self.vault)),
             patch.object(application.QPrinterInfo,'availablePrinters',return_value=[SimpleNamespace(printerName=lambda:'Test printer')]),
-            patch.object(application,'PrintWorker',FakePrintWorker)]
+            patch.object(application,'PrintWorker',FakePrintWorker),
+            patch.object(application,'NativePrintJob',FakePrintWorker)]
         for p in self.patches: p.start()
         self.windows=[]; self.window=self.new_window()
     def new_window(self):
-        window=application.Window(); self.windows.append(window); self.qt.processEvents(); window.timer.stop(); return window
+        window=application.Window(); self.windows.append(window); self.qt.processEvents(); window.timer.stop(); window.spool_timer.stop(); return window
     def photo(self,name,color):
         path=self.base/name; image=QImage(300,400,QImage.Format.Format_RGB32); image.fill(QColor(color)); image.save(str(path)); return path
     def finish_print(self,window,error=None):
@@ -126,4 +142,111 @@ class AppTests(unittest.TestCase):
         entry=(path,next(iter(w.pending))); w.send_batch([entry]); self.qt.processEvents()
         w.send_batch([entry]); self.assertEqual(len(w.print_queue),0)
         self.assertIn('không xếp thêm bản trùng',w.status.text()); self.finish_print(w)
+    def test_manual_can_reprint_submitted_image_when_auto_is_off(self):
+        w=self.window; w.enqueue(self.photo('again.png','red'),False); w.check_all(True)
+        with patch.object(QMessageBox,'question',return_value=QMessageBox.StandardButton.Yes):
+            for _ in range(2):
+                w.manual(); self.qt.processEvents(); self.assertIsNotNone(w.print_worker); self.finish_print(w)
+        self.assertFalse(w.auto.isChecked()); self.assertEqual(w.queue_table.topLevelItemCount(),2)
+    def test_manual_microsoft_pdf_real_export_never_uses_native_driver(self):
+        w=self.window; w.printer.addItem('Microsoft Print to PDF'); w.printer.setCurrentText('Microsoft Print to PDF')
+        w.enqueue(self.photo('one.png','red'),False); w.enqueue(self.photo('two.png','blue'),False); w.check_all(True)
+        output=self.base/'ảnh thử.pdf'
+        with patch.object(application,'PrintWorker',printing.PrintWorker),patch.object(QMessageBox,'question',return_value=QMessageBox.StandardButton.Yes),patch.object(application.QFileDialog,'getSaveFileName',return_value=(str(output),'')),patch.object(printing.QPrinterInfo,'printerInfo',side_effect=AssertionError('Must not use a native PDF driver')):
+            w.manual(); self.qt.processEvents(); worker=w.print_worker; self.assertIsNotNone(worker)
+            self.assertTrue(worker.wait(10000)); self.assertIsNone(worker.error); self.qt.processEvents(); self.qt.processEvents()
+        self.assertIsNone(w.print_worker); self.assertTrue(output.exists())
+        pdf=QPdfDocument(); pdf.load(str(output)); self.assertEqual(pdf.pageCount(),1); pdf.close()
+        self.assertEqual(w.db.execute('SELECT COUNT(*) FROM jobs WHERE state=?',('exported',)).fetchone()[0],2)
+        run=next(iter(w.run_data.values())); self.assertEqual(run['state'],'exported'); self.assertEqual(run['done'],8)
+    def test_cancel_manual_pdf_does_not_reserve_or_lock_photo(self):
+        w=self.window; w.printer.setCurrentText(application.PDF_PRINTER); w.enqueue(self.photo('one.png','red'),False); w.check_all(True)
+        with patch.object(QMessageBox,'question',return_value=QMessageBox.StandardButton.Yes),patch.object(application.QFileDialog,'getSaveFileName',return_value=('','')):
+            w.manual()
+        self.assertEqual(len(w.print_queue),0); self.assertIsNone(w.print_worker)
+        self.assertEqual(w.db.execute('SELECT COUNT(*) FROM jobs').fetchone()[0],0)
+        self.assertEqual(w.queue_table.topLevelItemCount(),0)
+        with patch.object(QMessageBox,'question',return_value=QMessageBox.StandardButton.Yes),patch.object(application.QFileDialog,'getSaveFileName',return_value=(str(self.base/'retry.pdf'),'')):
+            w.manual(); self.qt.processEvents(); self.assertIsNotNone(w.print_worker); self.finish_print(w)
+    def test_explicit_pdf_export_without_available_physical_printer(self):
+        w=self.window; w.printer.setCurrentIndex(-1); w.enqueue(self.photo('one.png','blue'),False); w.check_all(True)
+        with patch.object(application.QFileDialog,'getSaveFileName',return_value=(str(self.base/'export.pdf'),'')):
+            w.pdf(); self.qt.processEvents()
+        self.assertEqual(w.print_worker.settings['pdf_output'],str(self.base/'export.pdf')); self.finish_print(w)
+    def test_automatic_pdf_chooses_file_without_any_dialog(self):
+        w=self.window; w.printer.setCurrentText(application.PDF_PRINTER); w.auto.setChecked(True)
+        with patch.object(application.QFileDialog,'getSaveFileName',side_effect=AssertionError('Auto must not open a save dialog')):
+            w.enqueue(self.photo('auto.png','green'),True); self.qt.processEvents()
+        self.assertTrue(Path(w.print_worker.settings['pdf_output']).is_relative_to(Path(w.pdf_folder.text())))
+        self.finish_print(w)
+    def test_no_selection_does_not_start_manual_print(self):
+        w=self.window
+        with patch.object(w,'error') as error: w.manual(); error.assert_called_once()
+        self.assertIsNone(w.print_worker); self.assertEqual(w.queue_table.topLevelItemCount(),0)
+    def test_progress_pause_resume_cancel_and_clear(self):
+        w=self.window; w.enqueue(self.photo('one.png','red'),False); w.check_all(True)
+        w.send_batch(w.selected_entries(),pdf_output=str(self.base/'progress.pdf')); self.qt.processEvents()
+        worker=w.print_worker; worker.progress.emit(2,4,str(self.base/'one.png')); self.qt.processEvents()
+        self.assertEqual(w.progress_bar.value(),2); self.assertIn('one.png',w.progress_label.text())
+        w.pause_printing(); self.assertTrue(worker.paused); self.assertTrue(w.queue_paused)
+        w.resume_printing(); self.assertFalse(worker.paused); self.assertFalse(w.queue_paused)
+        w.clear_progress(); self.assertEqual(w.queue_table.topLevelItemCount(),1)
+        w.cancel_selected_print(); self.assertTrue(worker.cancelled); self.finish_print(w)
+        self.assertEqual(next(iter(w.run_data.values()))['state'],'cancelled')
+        w.clear_progress(); self.assertEqual(w.queue_table.topLevelItemCount(),0); self.assertEqual(w.list.count(),1)
+    def test_paused_queue_does_not_start_until_resume(self):
+        w=self.window; w.enqueue(self.photo('one.png','blue'),False); w.check_all(True); w.pause_printing()
+        w.send_batch(w.selected_entries()); self.qt.processEvents(); self.assertIsNone(w.print_worker)
+        self.assertEqual(len(w.print_queue),1); w.resume_printing(); self.assertIsNotNone(w.print_worker); self.finish_print(w)
+    def use_spooler(self,w,api):
+        w.spooler=WindowsSpooler(api); w.spool_pool.shutdown(wait=False); w.spool_command_pool.shutdown(wait=False)
+        w.spool_pool=ImmediatePool(); w.spool_command_pool=ImmediatePool()
+    def spool_job(self):
+        w=self.window; api=FakeAPI(); api.device=0x80; self.use_spooler(w,api)
+        path=self.photo('offline.png','blue'); w.enqueue(path,False); entry=(path,next(iter(w.pending)))
+        w.send_batch([entry]); self.qt.processEvents(); job=w.current_print_job
+        api.jobs=[{'JobId':71,'pDocument':job['settings']['document'],'Status':0}]
+        w.print_worker.spool_job.emit(71); self.qt.processEvents(); self.finish_print(w)
+        return w,api,job
+    def test_offline_spool_job_is_not_finished_and_cancel_calls_windows(self):
+        w,api,job=self.spool_job(); w.poll_spooler(); w.poll_spooler()
+        self.assertIn(job['id'],w.spool_jobs); self.assertEqual(w.run_data[job['id']]['state'],'spool_wait')
+        self.assertIn('Offline',w.run_items[job['id']].text(3))
+        w.cancel_selected_print(); self.assertEqual(api.commands[-1],('Test printer',71,0,None,5))
+        self.assertNotEqual(w.run_data[job['id']]['state'],'cancelled')
+        for _ in range(3): w.poll_spooler()
+        self.assertNotIn(job['id'],w.spool_jobs); self.assertEqual(w.run_data[job['id']]['state'],'cancelled')
+    def test_spool_query_error_never_claims_completion(self):
+        w,api,job=self.spool_job(); api.fail_read=True
+        w.poll_spooler(); w.poll_spooler()
+        self.assertEqual(w.run_data[job['id']]['state'],'spool_error'); self.assertIn(job['id'],w.spool_jobs)
+        self.assertIn(job['entries'][0][1],w.active_digests())
+    def test_pause_resume_calls_windows_for_pending_spool_job(self):
+        w,api,job=self.spool_job(); w.pause_printing(); w.resume_printing()
+        self.assertEqual([call[-1] for call in api.commands],[1,2])
+    def test_clear_progress_keeps_offline_spool_job(self):
+        w,api,job=self.spool_job(); w.clear_progress()
+        self.assertIn(job['id'],w.run_data); self.assertEqual(w.queue_table.topLevelItemCount(),1)
+    def test_reopen_restores_pending_windows_job_and_can_cancel_it(self):
+        w,api,job=self.spool_job(); w.close()
+        with patch.object(application,'WindowsSpooler',return_value=WindowsSpooler(api)):
+            restored=self.new_window()
+        self.use_spooler(restored,api)
+        self.assertIn(job['id'],restored.spool_jobs)
+        restored.cancel_selected_print(); self.assertEqual(api.commands[-1][-1],5)
+        for _ in range(3): restored.poll_spooler()
+        self.assertNotIn(job['id'],restored.spool_jobs)
+    def test_present_printed_flag_is_not_complete_until_queue_removes_job(self):
+        w,api,job=self.spool_job(); api.jobs[0]['Status']=0x80; api.device=0
+        w.poll_spooler(); w.poll_spooler()
+        self.assertEqual(w.run_data[job['id']]['state'],'spool_wait'); self.assertIn(job['id'],w.spool_jobs)
+        api.jobs=[]
+        for _ in range(3): w.poll_spooler()
+        self.assertEqual(w.run_data[job['id']]['state'],'completed'); self.assertNotIn(job['id'],w.spool_jobs)
+        self.assertNotIn(job['entries'][0][1],w.active_digests())
+    def test_windows_cancel_denied_remains_pending_and_reports_error(self):
+        w,api,job=self.spool_job(); api.fail_command=True; w.cancel_selected_print()
+        for _ in range(3): w.poll_spooler()
+        self.assertIn(job['id'],w.spool_jobs); self.assertEqual(w.run_data[job['id']]['state'],'spool_error')
+        self.assertIn('PermissionError',w.run_items[job['id']].text(3)); self.assertEqual(len(api.jobs),1)
 if __name__=='__main__': unittest.main()

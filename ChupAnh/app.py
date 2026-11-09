@@ -1,4 +1,5 @@
-import sys,json,hashlib,sqlite3,os,time
+import sys,json,hashlib,sqlite3,os,time,uuid
+from datetime import datetime
 from collections import deque
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -7,22 +8,29 @@ from PySide6.QtCore import Qt,QTimer,QSize,QLockFile
 from PySide6.QtGui import QImageReader,QIcon,QPixmap
 from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QFormLayout,QVBoxLayout,
     QHBoxLayout,QPushButton,QComboBox,QSpinBox,QLineEdit,QFileDialog,QListWidget,
-    QListWidgetItem,QListView,QAbstractItemView,QCheckBox,QMessageBox,QLabel)
+    QListWidgetItem,QListView,QAbstractItemView,QCheckBox,QMessageBox,QLabel,
+    QTreeWidget,QTreeWidgetItem,QProgressBar,QGroupBox)
 from PySide6.QtPrintSupport import QPrinterInfo,QPrintPreviewDialog
 from layout import PAPERS,PHOTOS
-from printing import create_printer,render,PrintWorker
+from printing import create_printer,render,PrintWorker,NativePrintJob,PDF_PRINTER,is_pdf_printer
+from spooler import WindowsSpooler,status_text
 BASE=Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'TelegramPhotoPrint'
 BASE.mkdir(parents=True,exist_ok=True)
 PATH_ROLE=int(Qt.ItemDataRole.UserRole)+1
 
 class Window(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('Telegram Photo Print 1.2.1 — Windows'); self.resize(1040,820)
+        super().__init__(); self.setWindowTitle('Telegram Photo Print 1.3 — Windows'); self.resize(1040,820)
         self.db=sqlite3.connect(BASE/'history.sqlite')
         self.db.execute('CREATE TABLE IF NOT EXISTS jobs (digest TEXT PRIMARY KEY,state TEXT,file TEXT)')
         self.db.execute('CREATE TABLE IF NOT EXISTS images (digest TEXT PRIMARY KEY,path TEXT,added REAL)')
         self.recovered=self.db.execute("UPDATE jobs SET state='review' WHERE state IN ('queued','sending')").rowcount
+        self.db.execute('CREATE TABLE IF NOT EXISTS print_runs (id TEXT PRIMARY KEY,created REAL,label TEXT,state TEXT,done INTEGER,total INTEGER,current TEXT,printer TEXT,output TEXT,document TEXT,spool_id INTEGER)')
+        self.db.execute('CREATE TABLE IF NOT EXISTS print_run_images (run_id TEXT,digest TEXT,PRIMARY KEY(run_id,digest))')
         self.db.commit()
+        self.run_items={}; self.run_data={}; self.spool_jobs={}; self.queue_paused=False
+        self.spooler=WindowsSpooler(); self.spool_pool=ThreadPoolExecutor(max_workers=1)
+        self.spool_command_pool=ThreadPoolExecutor(max_workers=1); self.spool_reads={}; self.spool_commands=[]; self.last_progress_commit=0
         self.pending={}; self.items={}; self.stable={}; self.closing=False; self.closed=False
         self.print_queue=deque(); self.print_worker=None; self.current_print_job=None
         self.pool=ThreadPoolExecutor(max_workers=1); self.future=None; self.generation=0
@@ -39,6 +47,7 @@ class Window(QMainWindow):
         self.count=QSpinBox(); self.count.setRange(1,999)
         try: self.count.setValue(int(self.saved.get('count',4)))
         except (TypeError,ValueError): self.count.setValue(4)
+        self.pdf_folder=QLineEdit(self.saved.get('pdf_folder',str(BASE/'pdf-output'))); self.pdf_folder.setReadOnly(True)
         self.auto=QCheckBox('Tự động in ảnh MỚI — gửi in ngay, không cần bấm In ảnh đã chọn')
         self.list=QListWidget(); self.list.setViewMode(QListView.ViewMode.IconMode)
         self.list.setIconSize(QSize(100,130)); self.list.setGridSize(QSize(150,185))
@@ -50,6 +59,9 @@ class Window(QMainWindow):
         form=QFormLayout(); form.addRow('Thư mục ảnh bổ sung (tùy chọn)',self.folder); form.addRow('',self.recursive)
         form.addRow('Khổ giấy',self.paper); form.addRow('Máy in',self.printer)
         form.addRow('Kích thước ảnh',self.photo); form.addRow('Số bản / mỗi ảnh',self.count)
+        pdf_row=QHBoxLayout(); pdf_row.addWidget(self.pdf_folder)
+        pdf_button=QPushButton('Chọn thư mục'); pdf_button.clicked.connect(self.choose_pdf_folder); pdf_row.addWidget(pdf_button)
+        form.addRow('Thư mục PDF tự động',pdf_row)
         root=QVBoxLayout(); root.addLayout(form)
         buttons=QHBoxLayout()
         for label,fn in [('Chọn thư mục',self.choose_folder),('Mở thư mục',self.open_folder),('Thêm ảnh',self.add_files),('Làm mới máy in',self.refresh_printers),('Kết nối Telegram',self.collect),('Lưu cài đặt',self.save_settings)]:
@@ -63,6 +75,19 @@ class Window(QMainWindow):
         for label,fn in [('Xem trước ảnh đã chọn',self.preview),('In ảnh đã chọn',self.manual),('Xuất PDF ảnh đã chọn',self.pdf)]:
             button=QPushButton(label); button.clicked.connect(fn); actions.addWidget(button)
         root.addLayout(actions)
+        progress_group=QGroupBox('Tiến độ và hàng đợi in'); progress_layout=QVBoxLayout(progress_group)
+        self.progress_label=QLabel('Chưa có tác vụ in'); self.progress_label.setWordWrap(True)
+        self.progress_bar=QProgressBar(); self.progress_bar.setRange(0,1); self.progress_bar.setValue(0)
+        progress_layout.addWidget(self.progress_label); progress_layout.addWidget(self.progress_bar)
+        self.queue_table=QTreeWidget(); self.queue_table.setHeaderLabels(['Lượt in','Ảnh đang xử lý','Đã xử lý','Trạng thái','Máy in / PDF'])
+        self.queue_table.currentItemChanged.connect(lambda *_:self.show_selected_progress())
+        self.queue_table.setRootIsDecorated(False); self.queue_table.setAlternatingRowColors(True); self.queue_table.setMaximumHeight(140)
+        for index,width in enumerate([155,170,85,260,240]): self.queue_table.setColumnWidth(index,width)
+        progress_layout.addWidget(self.queue_table)
+        controls=QHBoxLayout()
+        for label,fn in [('Tạm dừng',self.pause_printing),('Tiếp tục',self.resume_printing),('Hủy lệnh đã chọn',self.cancel_selected_print),('Mở hàng đợi Windows',self.open_windows_queue),('Xóa tiến độ đã xong',self.clear_progress)]:
+            button=QPushButton(label); button.clicked.connect(fn); controls.addWidget(button)
+        progress_layout.addLayout(controls); root.addWidget(progress_group)
         if self.recovered:
             notice=QLabel(f'{self.recovered} ảnh có tác vụ cũ chưa rõ kết quả. Đã bỏ trạng thái chờ bị kẹt; kiểm tra hàng đợi Windows trước khi in lại bằng tay.')
             notice.setWordWrap(True); root.addWidget(notice)
@@ -74,6 +99,8 @@ class Window(QMainWindow):
         self.restore_paths=deque(path for path, in self.db.execute('SELECT path FROM images ORDER BY added'))
         from telegram_ui import TelegramDialog
         self.telegram_dialog=TelegramDialog(self,BASE)
+        self.load_run_history()
+        self.spool_timer=QTimer(self); self.spool_timer.timeout.connect(self.poll_spooler); self.spool_timer.start(700)
         QTimer.singleShot(0,self.startup)
     def startup(self):
         if self.closing: return
@@ -94,12 +121,12 @@ class Window(QMainWindow):
         temporary.write_text(json.dumps(self.saved,ensure_ascii=False,indent=2),encoding='utf-8'); temporary.replace(self.settings)
     def save_settings(self):
         try:
-            self.saved.update(self.snapshot()); self.saved.update(folder=self.folder.text(),recursive=self.recursive.isChecked(),auto_print=self.auto.isChecked())
+            self.saved.update(self.snapshot()); self.saved.update(folder=self.folder.text(),recursive=self.recursive.isChecked(),auto_print=self.auto.isChecked(),pdf_folder=self.pdf_folder.text())
             self.write_settings(); self.status.setText('Đã lưu máy in, khổ giấy, kích thước, số bản, thư mục và trạng thái tự động in.')
         except OSError as exc: self.error(exc)
     def refresh_printers(self):
         preferred=self.printer.currentText() or self.saved.get('printer','')
-        self.printer.clear(); self.printer.addItems([p.printerName() for p in QPrinterInfo.availablePrinters()])
+        self.printer.clear(); self.printer.addItems([p.printerName() for p in QPrinterInfo.availablePrinters()]); self.printer.addItem(PDF_PRINTER)
         if preferred: self.printer.setCurrentIndex(self.printer.findText(preferred))
     def error(self,exc): QMessageBox.warning(self,'Thông báo',str(exc))
     def choose_folder(self):
@@ -111,6 +138,9 @@ class Window(QMainWindow):
         try: self.write_settings()
         except OSError as exc: self.error(exc)
         self.status.setText('Đã chọn thư mục. Ảnh có sẵn chỉ vào thư viện, không tự in khi bật tự động.')
+    def choose_pdf_folder(self):
+        folder=QFileDialog.getExistingDirectory(self,'Chọn thư mục lưu PDF tự động',self.pdf_folder.text())
+        if folder: self.pdf_folder.setText(folder)
     def open_folder(self):
         from PySide6.QtGui import QDesktopServices
         from PySide6.QtCore import QUrl
@@ -124,10 +154,14 @@ class Window(QMainWindow):
             if not getattr(self,'closing_telegram',False):
                 self.closing_telegram=True
                 self.telegram_dialog.worker.finished.connect(lambda:QTimer.singleShot(0,self.close)); self.telegram_dialog.stop()
-        if self.print_worker: waiting=True
+        if self.print_worker:
+            waiting=True; self.print_worker.cancel()
+            if self.current_print_job and not self.current_print_job['settings'].get('pdf_output'):
+                self.request_spool_command(self.current_print_job,'cancel')
         if waiting:
             self.status.setText('Đang kết thúc tác vụ hiện tại và ngắt Telegram…'); event.ignore(); return
-        self.timer.stop(); self.pool.shutdown(wait=False,cancel_futures=True); self.closed=True
+        self.timer.stop(); self.spool_timer.stop(); self.pool.shutdown(wait=False,cancel_futures=True)
+        self.spool_pool.shutdown(wait=False,cancel_futures=True); self.spool_command_pool.shutdown(wait=False); self.closed=True
         self.db.close(); event.accept()
     def add_files(self):
         paths,_=QFileDialog.getOpenFileNames(self,'Chọn ảnh','','Ảnh (*.jpg *.jpeg *.png *.webp *.bmp)')
@@ -199,31 +233,44 @@ class Window(QMainWindow):
             printer=create_printer(settings,BASE/'preview.pdf'); dialog=QPrintPreviewDialog(printer,self)
             dialog.paintRequested.connect(lambda p:render(p,paths,settings)); dialog.exec()
         except Exception as exc: self.error(exc)
+    def ask_pdf_path(self):
+        path,_=QFileDialog.getSaveFileName(self,'Lưu ảnh đã chọn thành PDF','anh-in.pdf','PDF (*.pdf)',options=QFileDialog.Option.DontUseNativeDialog)
+        if not path: return None
+        return str(Path(path).with_suffix('.pdf')) if Path(path).suffix.lower()!='.pdf' else path
     def pdf(self):
         try:
-            paths=[path for path,_ in self.selected_entries()]; dest,_=QFileDialog.getSaveFileName(self,'Lưu PDF','anh-in.pdf','PDF (*.pdf)')
-            if dest:
-                settings=self.snapshot(); render(create_printer(settings,dest),paths,settings)
-                self.status.setText(f'Đã xuất PDF cho {len(paths)} ảnh: {dest}')
+            entries=self.selected_entries(); destination=self.ask_pdf_path()
+            if destination: self.send_batch(entries,pdf_output=destination)
+            else: self.status.setText('Đã hủy lưu PDF. Chưa tạo tác vụ in.')
         except Exception as exc: self.error(exc)
     def send(self,path,digest): self.send_batch([(Path(path),digest)],automatic=True)
     def active_digests(self):
         jobs=list(self.print_queue)
         if self.current_print_job: jobs.append(self.current_print_job)
+        jobs.extend(self.spool_jobs.values())
         return {digest for job in jobs for _,digest in job['entries']}
-    def send_batch(self,entries,automatic=False):
+    def send_batch(self,entries,automatic=False,pdf_output=None):
         if self.closing: return
         settings=self.snapshot()
-        if not settings['printer']: raise ValueError('Hãy chọn máy in trước khi in.')
+        if not settings['printer'] and not pdf_output: raise ValueError('Hãy chọn máy in trước khi in.')
         active=self.active_digests(); original_count=len(entries)
         entries=[(path,digest) for path,digest in entries if digest not in active]
         skipped=original_count-len(entries)
         if not entries:
             self.status.setText('Các ảnh này đang được xử lý; không xếp thêm bản trùng. Bạn có thể tiếp tục chọn ảnh khác.')
             return
+        if is_pdf_printer(settings['printer']) and not pdf_output:
+            if not automatic: raise ValueError('Chọn nơi lưu PDF trước khi gửi tác vụ.')
+            folder=Path(self.pdf_folder.text()); folder.mkdir(parents=True,exist_ok=True)
+            pdf_output=str(folder/('Anh_'+datetime.now().strftime('%Y%m%d_%H%M%S_')+uuid.uuid4().hex[:8]+'.pdf'))
+        if pdf_output: settings['pdf_output']=str(pdf_output)
+        run_id=uuid.uuid4().hex; settings['document']='ChupAnh '+run_id
         for path,digest in entries:
+            self.db.execute('INSERT OR IGNORE INTO print_run_images VALUES (?,?)',(run_id,digest))
             self.db.execute('INSERT OR REPLACE INTO jobs VALUES (?,?,?)',(digest,'queued',str(path)))
-        self.db.commit(); self.print_queue.append({'entries':list(entries),'settings':settings,'automatic':automatic})
+        job={'id':run_id,'entries':list(entries),'settings':settings,'automatic':automatic,'render_complete':False,'spool_id':None,'cancel_requested':False}
+        self.print_queue.append(job)
+        self.add_run(job)
         self.status.setText(f'Đã xếp hàng {len(entries)} ảnh, {settings["count"]} bản mỗi ảnh.'+(f' Bỏ qua {skipped} ảnh đang được xử lý.' if skipped else ''))
         QTimer.singleShot(0,self.start_next_print)
     def cancel_queued_prints(self,automatic_only=False):
@@ -231,33 +278,224 @@ class Window(QMainWindow):
         for job in self.print_queue:
             if automatic_only and not job['automatic']: keep.append(job); continue
             for _,digest in job['entries']: self.db.execute('UPDATE jobs SET state=? WHERE digest=?',('cancelled',digest))
+            self.set_run(job,'cancelled',text='Đã hủy trước khi gửi')
         self.print_queue=keep; self.db.commit()
     def start_next_print(self):
-        if self.closing or self.print_worker or not self.print_queue: return
+        if self.closing or self.queue_paused or self.print_worker or not self.print_queue: return
         job=self.print_queue.popleft(); self.current_print_job=job
         for _,digest in job['entries']: self.db.execute('UPDATE jobs SET state=? WHERE digest=?',('sending',digest))
-        self.db.commit()
-        worker=PrintWorker([path for path,_ in job['entries']],job['settings'],self); self.print_worker=worker
+        self.db.commit(); self.queue_table.setCurrentItem(self.run_items[job['id']]); self.set_run(job,'running',text='Đang xử lý ảnh')
+        job_type=PrintWorker if job['settings'].get('pdf_output') else NativePrintJob
+        worker=job_type([path for path,_ in job['entries']],job['settings'],self); self.print_worker=worker
+        worker.progress.connect(lambda done,total,path:self.update_print_progress(job,done,total,path),Qt.ConnectionType.QueuedConnection)
+        if hasattr(worker,'spool_job'): worker.spool_job.connect(lambda identity:self.attach_spool_job(job,identity),Qt.ConnectionType.QueuedConnection)
         worker.finished.connect(lambda:self.print_finished(worker,job),Qt.ConnectionType.QueuedConnection); worker.start()
-        self.status.setText(f'Đang gửi {len(job["entries"])} ảnh tới máy in…')
+        self.status.setText(f'Đang xuất PDF cho {len(job["entries"])} ảnh…' if job['settings'].get('pdf_output') else f'Đang gửi {len(job["entries"])} ảnh tới máy in…')
     def print_finished(self,worker,job):
-        state='review' if worker.error else 'submitted'
+        job['render_complete']=True; job['finished_at']=time.monotonic(); job['render_error']=worker.error
+        is_pdf=bool(job['settings'].get('pdf_output')); cancelled=worker.cancelled
+        state='review' if worker.error else ('cancelled' if cancelled and is_pdf else ('review' if cancelled else ('exported' if is_pdf else 'submitted')))
         for _,digest in job['entries']: self.db.execute('UPDATE jobs SET state=? WHERE digest=?',(state,digest))
         self.db.commit(); self.print_worker=None; self.current_print_job=None; worker.deleteLater()
         if worker.error:
             self.auto.setChecked(False); self.cancel_queued_prints()
-            self.status.setText('In gặp lỗi: '+worker.error+' Kiểm tra hàng đợi máy in trước khi in lại.')
-        else: self.status.setText(f'Đã gửi {len(job["entries"])} ảnh tới hàng đợi máy in; chưa xác nhận giấy đã ra.')
+            self.set_run(job,'error',text='Lỗi: '+worker.error)
+            self.status.setText('In gặp lỗi: '+worker.error+' Kiểm tra hàng đợi trước khi in lại.')
+            if not is_pdf and self.spooler.available: self.spool_jobs[job['id']]=job
+        elif is_pdf:
+            if cancelled: self.set_run(job,'cancelled',text='Đã hủy PDF; không thay tệp đích')
+            else:
+                self.set_run(job,'exported',done=self.run_data[job['id']]['total'],text='PDF hoàn tất')
+                self.status.setText('Đã lưu PDF: '+job['settings']['pdf_output'])
+        else:
+            if cancelled: job['cancel_requested']=True
+            if self.spooler.available:
+                self.spool_jobs[job['id']]=job
+                self.status.setText('Đã gửi dữ liệu; đang theo dõi hàng đợi Windows để xác nhận kết thúc.')
+                self.set_run(job,'cancelling' if job.get('cancel_requested') else 'spool_wait',text='Đang chờ Windows xác nhận hủy' if job.get('cancel_requested') else 'Đang chờ Windows xác nhận hàng đợi')
+                if cancelled: self.request_spool_command(job,'cancel')
+            else:
+                self.set_run(job,'unconfirmed',text='Đã gửi; chưa đọc được hàng đợi Windows')
+                self.status.setText('Đã gửi máy in, chưa xác nhận hoàn tất. Chạy lại CAI_DAT.bat để cài theo dõi hàng đợi Windows.')
         if self.closing: QTimer.singleShot(0,self.close)
         else: QTimer.singleShot(0,self.start_next_print)
     def manual(self):
         try:
-            entries=self.selected_entries(); total=len(entries)*self.count.value()
+            entries=[entry for entry in self.selected_entries() if entry[1] not in self.active_digests()]
+            if not entries:
+                self.status.setText('Ảnh đã chọn đang được xử lý. Chờ tác vụ kết thúc rồi có thể in lại.'); return
+            total=len(entries)*self.count.value()
             review=sum(1 for _,digest in entries if self.db.execute('SELECT state FROM jobs WHERE digest=?',(digest,)).fetchone()==('review',))
             warning=f'\n{review} ảnh có tác vụ trước chưa rõ kết quả; hãy kiểm tra hàng đợi Windows trước khi in lại.' if review else ''
             if QMessageBox.question(self,'Xác nhận in',f'In {len(entries)} ảnh khác nhau × {self.count.value()} bản = {total} ảnh, giấy {self.paper.currentText()}?'+warning)==QMessageBox.StandardButton.Yes:
-                self.send_batch(entries)
+                destination=None
+                if is_pdf_printer(self.printer.currentText()):
+                    destination=self.ask_pdf_path()
+                    if not destination:
+                        self.status.setText('Đã hủy lưu PDF. Chưa tạo tác vụ in.'); return
+                self.send_batch(entries,pdf_output=destination)
         except Exception as exc: self.error(exc)
+    def add_run(self,job):
+        total=len(job['entries'])*job['settings']['count']; created=time.time()
+        label=datetime.fromtimestamp(created).strftime('%H:%M:%S')+f" • {len(job['entries'])} ảnh × {job['settings']['count']}"
+        data={'id':job['id'],'created':created,'label':label,'state':'queued','done':0,'total':total,'current':'',
+              'printer':job['settings']['printer'],'output':job['settings'].get('pdf_output',''),'document':job['settings']['document'],'spool_id':None}
+        self.run_data[job['id']]=data; self.create_run_item(data)
+        self.persist_run(data); self.db.commit(); self.set_run(job,'queued',text='Đang chờ' if not self.queue_paused else 'Chờ — hàng đợi đang tạm dừng')
+    def create_run_item(self,data):
+        item=QTreeWidgetItem([data['label'],Path(data['current']).name if data['current'] else '',f"{data['done']}/{data['total']}",data['state'],data['output'] or data['printer']])
+        item.setData(0,Qt.ItemDataRole.UserRole,data['id']); item.setToolTip(4,data['output'] or data['printer'])
+        self.queue_table.addTopLevelItem(item); self.run_items[data['id']]=item
+        if not self.queue_table.currentItem(): self.queue_table.setCurrentItem(item)
+    def persist_run(self,data):
+        self.db.execute('INSERT OR REPLACE INTO print_runs VALUES (?,?,?,?,?,?,?,?,?,?,?)',tuple(data[key] for key in ('id','created','label','state','done','total','current','printer','output','document','spool_id')))
+    def set_run(self,job,state,done=None,current=None,text=None):
+        data=self.run_data.get(job['id'])
+        if not data: return
+        data['state']=state
+        if done is not None: data['done']=done
+        if current is not None: data['current']=current
+        data['spool_id']=job.get('spool_id')
+        item=self.run_items[job['id']]; item.setText(1,Path(data['current']).name if data['current'] else '')
+        item.setToolTip(1,data['current']); item.setText(2,f"{data['done']}/{data['total']}")
+        item.setText(3,text or state)
+        self.persist_run(data)
+        if state!='running' or time.monotonic()-self.last_progress_commit>.25:
+            self.db.commit(); self.last_progress_commit=time.monotonic()
+        selected=self.queue_table.currentItem()
+        if not selected or selected.data(0,Qt.ItemDataRole.UserRole)==job['id']: self.show_selected_progress()
+    def show_selected_progress(self):
+        item=self.queue_table.currentItem()
+        if not item: return
+        data=self.run_data.get(item.data(0,Qt.ItemDataRole.UserRole))
+        if not data: return
+        self.progress_bar.setRange(0,max(data['total'],1)); self.progress_bar.setValue(data['done'])
+        if data['state'] in ('spool_wait','spool_error','cancelling','unconfirmed'):
+            self.progress_bar.setFormat('Chưa hoàn tất — đã xử lý %v/%m ảnh')
+        elif data['state']=='exported': self.progress_bar.setFormat('PDF hoàn tất — %v/%m ảnh')
+        elif data['state']=='completed': self.progress_bar.setFormat('Không còn trong hàng đợi Windows')
+        else: self.progress_bar.setFormat('Đã xử lý %v/%m ảnh (%p%)')
+        suffix=' • '+Path(data['current']).name if data['current'] else ''
+        self.progress_label.setText(item.text(3)+suffix)
+    def update_print_progress(self,job,done,total,path):
+        state='paused' if self.queue_paused else 'running'
+        self.set_run(job,state,done=done,current=path,text='Tạm dừng' if self.queue_paused else 'Đang xử lý ảnh')
+    def load_run_history(self):
+        columns=('id','created','label','state','done','total','current','printer','output','document','spool_id')
+        rows=self.db.execute('SELECT * FROM print_runs ORDER BY created DESC LIMIT 100').fetchall()
+        for row in reversed(rows):
+            data=dict(zip(columns,row)); self.run_data[data['id']]=data; self.create_run_item(data)
+            unfinished=data['state'] in ('queued','running','paused','cancelling','spool_wait','spool_error','unconfirmed','error')
+            entries=[(Path(path),digest) for path,digest in self.db.execute('SELECT jobs.file,jobs.digest FROM print_run_images JOIN jobs ON jobs.digest=print_run_images.digest WHERE print_run_images.run_id=?',(data['id'],))]
+            job={'id':data['id'],'entries':entries,'settings':{'printer':data['printer'],'document':data['document'],'pdf_output':data['output']},'automatic':False,
+                 'spool_id':data['spool_id'],'render_complete':True,'finished_at':time.monotonic(),'cancel_requested':data['state']=='cancelling','render_error':'Lỗi ở lần chạy trước' if data['state']=='error' else None}
+            if unfinished and not data['output'] and self.spooler.available:
+                self.spool_jobs[data['id']]=job; self.set_run(job,'spool_wait',text='Đang kiểm tra lại hàng đợi Windows')
+            elif unfinished: self.set_run(job,'interrupted',text='Tác vụ trước bị gián đoạn — kiểm tra trước khi in lại')
+            else:
+                texts={'exported':'PDF hoàn tất','completed':'Không còn trong hàng đợi Windows','cancelled':'Đã hủy','error':'Lỗi ở lần chạy trước','interrupted':'Bị gián đoạn','submitted':'Đã gửi máy in'}
+                self.run_items[data['id']].setText(3,texts.get(data['state'],data['state']))
+    def pause_printing(self):
+        self.queue_paused=True
+        if self.print_worker: self.print_worker.pause()
+        targets=dict(self.spool_jobs)
+        if self.current_print_job and not self.current_print_job['settings'].get('pdf_output'): targets[self.current_print_job['id']]=self.current_print_job
+        for job in targets.values(): self.request_spool_command(job,'pause')
+        if self.current_print_job: self.set_run(self.current_print_job,'paused',text='Đã tạm dừng xử lý')
+        self.status.setText('Đã tạm dừng hàng đợi của phần mềm; đang gửi yêu cầu tạm dừng các lệnh Windows đã nhận diện.')
+    def resume_printing(self):
+        self.queue_paused=False
+        if self.print_worker: self.print_worker.resume()
+        targets=dict(self.spool_jobs)
+        if self.current_print_job and not self.current_print_job['settings'].get('pdf_output'): targets[self.current_print_job['id']]=self.current_print_job
+        for job in targets.values(): self.request_spool_command(job,'resume')
+        if self.current_print_job: self.set_run(self.current_print_job,'running',text='Tiếp tục xử lý ảnh')
+        self.start_next_print(); self.status.setText('Đã tiếp tục hàng đợi.')
+    def cancel_selected_print(self):
+        item=self.queue_table.currentItem()
+        if not item: self.status.setText('Chọn một dòng tiến độ để hủy.'); return
+        identity=item.data(0,Qt.ItemDataRole.UserRole)
+        if self.current_print_job and self.current_print_job['id']==identity:
+            job=self.current_print_job; job['cancel_requested']=True; self.print_worker.cancel()
+            self.set_run(job,'cancelling',text='Đang hủy tác vụ')
+            if not job['settings'].get('pdf_output'): self.request_spool_command(job,'cancel')
+            return
+        for job in list(self.print_queue):
+            if job['id']==identity:
+                self.print_queue.remove(job)
+                for _,digest in job['entries']: self.db.execute('UPDATE jobs SET state=? WHERE digest=?',('cancelled',digest))
+                self.set_run(job,'cancelled',text='Đã hủy trước khi gửi'); return
+        if identity in self.spool_jobs:
+            job=self.spool_jobs[identity]; job['cancel_requested']=True; self.set_run(job,'cancelling',text='Đang yêu cầu Windows hủy lệnh')
+            self.request_spool_command(job,'cancel')
+        else: self.status.setText('Dòng này đã kết thúc hoặc chưa có mã lệnh Windows. Có thể mở hàng đợi Windows để kiểm tra.')
+    def request_spool_command(self,job,action):
+        if not self.spooler.available:
+            self.status.setText('Chưa có bộ điều khiển Windows. Chạy lại CAI_DAT.bat hoặc mở hàng đợi Windows để hủy.'); return
+        future=self.spool_command_pool.submit(self.spooler.command,job['settings']['printer'],job['settings']['document'],job.get('spool_id'),action)
+        self.spool_commands.append((job,action,future))
+    def attach_spool_job(self,job,identity):
+        job['spool_id']=identity; self.spool_jobs[job['id']]=job
+        self.run_data[job['id']]['spool_id']=identity; self.persist_run(self.run_data[job['id']]); self.db.commit()
+    def poll_spooler(self):
+        if self.closed: return
+        for job,action,future in list(self.spool_commands):
+            if not future.done(): continue
+            self.spool_commands.remove((job,action,future))
+            try:
+                result=future.result(); job.pop('control_error',None)
+                if result.get('job_id') is not None: job['spool_id']=result['job_id']
+                if job['id'] in self.spool_jobs or job is self.current_print_job:
+                    text={'cancel':'Đã yêu cầu Windows hủy; chờ lệnh biến mất','pause':'Đã gửi yêu cầu tạm dừng đến Windows','resume':'Đã gửi yêu cầu tiếp tục đến Windows'}[action]
+                    self.set_run(job,'cancelling' if action=='cancel' else 'spool_wait',text=text)
+            except Exception as exc:
+                job['control_error']='Windows chưa thực hiện được lệnh '+action+' ('+type(exc).__name__+')'
+                self.set_run(job,'spool_error',text=job['control_error'])
+        for identity,(issued,future) in list(self.spool_reads.items()):
+            if not future.done(): continue
+            self.spool_reads.pop(identity,None); job=self.spool_jobs.get(identity)
+            if not job: continue
+            try:
+                info=future.result()
+                if info['exists']:
+                    job['spool_id']=info['job_id']; job['absent_count']=0
+                    if job['render_complete']:
+                        text=status_text(info)
+                        if job.get('control_error'): text+=' • '+job['control_error']
+                        if info.get('pages'): text+=f" • {info.get('printed',0)}/{info['pages']} trang"
+                        self.set_run(job,'spool_error' if job.get('control_error') else ('cancelling' if job.get('cancel_requested') else 'spool_wait'),text=text)
+                elif job['render_complete'] and issued>=job.get('finished_at',0):
+                    job['absent_count']=job.get('absent_count',0)+1
+                    if job.get('spool_id') is not None or job['absent_count']>=2:
+                        cancelled=job.get('cancel_requested',False)
+                        final='cancelled' if cancelled else ('error' if job.get('render_error') else 'completed')
+                        self.set_run(job,final,text='Đã hủy / lệnh không còn trong Windows' if cancelled else ('Tác vụ lỗi; không còn lệnh trong Windows' if job.get('render_error') else 'Không còn trong hàng đợi Windows'))
+                        self.spool_jobs.pop(identity,None)
+                        if cancelled:
+                            for _,digest in job['entries']: self.db.execute('UPDATE jobs SET state=? WHERE digest=?',('review',digest))
+                            self.db.commit()
+            except Exception as exc: self.set_run(job,'spool_error',text='Chưa đọc được hàng đợi Windows ('+type(exc).__name__+') — chưa hoàn tất')
+        if not self.spooler.available: return
+        for identity,job in list(self.spool_jobs.items()):
+            if identity not in self.spool_reads:
+                self.spool_reads[identity]=(time.monotonic(),self.spool_pool.submit(self.spooler.read,job['settings']['printer'],job['settings']['document'],job.get('spool_id')))
+    def clear_progress(self):
+        active={job['id'] for job in self.print_queue}|set(self.spool_jobs)
+        if self.current_print_job: active.add(self.current_print_job['id'])
+        removed=0
+        for identity in list(self.run_items):
+            if identity in active or self.run_data[identity]['state'] not in ('exported','completed','cancelled','error','interrupted'): continue
+            item=self.run_items.pop(identity); self.queue_table.takeTopLevelItem(self.queue_table.indexOfTopLevelItem(item))
+            self.run_data.pop(identity,None); self.db.execute('DELETE FROM print_runs WHERE id=?',(identity,)); self.db.execute('DELETE FROM print_run_images WHERE run_id=?',(identity,)); removed+=1
+        self.db.commit(); self.status.setText(f'Đã xóa {removed} dòng tiến độ đã kết thúc; giữ các lệnh đang chờ. Không xóa ảnh hoặc lịch sử chống in trùng.')
+    def open_windows_queue(self):
+        if sys.platform!='win32': self.status.setText('Chức năng này dùng trên Windows.'); return
+        import subprocess
+        item=self.queue_table.currentItem(); identity=item.data(0,Qt.ItemDataRole.UserRole) if item else None
+        printer=self.run_data[identity]['printer'] if identity in self.run_data else self.printer.currentText()
+        if not printer or is_pdf_printer(printer): self.status.setText('Chọn một tác vụ của máy in thật.'); return
+        try: subprocess.Popen(['rundll32.exe','printui.dll,PrintUIEntry','/o','/n',printer])
+        except OSError as exc: self.error(exc)
     def collect(self):
         self.telegram_dialog.show(); self.telegram_dialog.raise_(); self.telegram_dialog.activateWindow()
 if __name__=='__main__':
