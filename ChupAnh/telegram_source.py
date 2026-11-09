@@ -2,7 +2,7 @@
 import asyncio, json, queue, sqlite3, re
 from pathlib import Path
 from PySide6.QtCore import QThread, Signal
-from telegram_access import allowed_bot
+from telegram_access import allowed_bot,allowed_account,normalize_phone
 
 class BotAPIError(Exception):
     def __init__(self,code): self.code=code
@@ -30,7 +30,7 @@ class TelegramWorker(QThread):
     def __init__(self,mode,credentials,base,parent=None):
         super().__init__(parent); self.mode=mode; self.credentials=credentials
         self.base=Path(base); self.commands=queue.Queue(); self.selected=None
-        self.stopping=False; self.identity=''; self.known={}
+        self.stopping=False; self.identity=''; self.known={}; self.access_verified=False
     def command(self,name,value=None): self.commands.put((name,value))
     def run(self):
         self.db=sqlite3.connect(self.base/'telegram.sqlite')
@@ -79,7 +79,7 @@ class TelegramWorker(QThread):
                     me=await api('getMe')
                     if not allowed_bot(me):
                         self.status.emit('Từ chối kết nối: phần mềm chỉ cho phép bot @pkhoahongbot.'); self.stage.emit('error'); return
-                    self.identity=str(me['id'])
+                    self.access_verified=True; self.identity=str(me['id'])
                     webhook=await api('getWebhookInfo')
                     if webhook.get('url'):
                         self.status.emit('Bot đang dùng webhook. Tắt webhook ở dịch vụ đang dùng hoặc tạo bot riêng; phần mềm không tự xóa webhook.')
@@ -143,7 +143,7 @@ class TelegramWorker(QThread):
         await client.connect()
         async def download(event):
             chat_id=event.chat_id
-            if self.selected!=chat_id or self.stopping: return
+            if not self.access_verified or self.selected!=chat_id or self.stopping: return
             message=event.message
             if message.photo: ext='.jpg'
             elif message.document and message.document.mime_type in SUPPORTED: ext=SUPPORTED[message.document.mime_type]
@@ -161,14 +161,20 @@ class TelegramWorker(QThread):
             finally: temporary.unlink(missing_ok=True)
         client.add_event_handler(download,events.NewMessage())
         async def ready():
-            self.identity=str((await client.get_me()).id)
+            self.access_verified=False
+            me=await client.get_me()
+            if not allowed_account(getattr(me,'phone',None)):
+                self.status.emit('Từ chối kết nối: chỉ tài khoản được cấp phép được sử dụng.'); self.stage.emit('error'); return False
+            self.access_verified=True; self.identity=str(me.id)
             async for dialog in client.iter_dialogs():
                 if dialog.is_group: self.known[utils.get_peer_id(dialog.entity)]=dialog.name
             self.groups.emit(list(self.known.items())); self.stage.emit('ready')
             self.status.emit('Đang nhận ảnh từ nhóm ID '+str(self.selected) if self.selected is not None else 'Đã đăng nhập. Chọn nhóm rồi bấm Nhận ảnh từ nhóm.')
+            return True
         try:
             authorized=await client.is_user_authorized()
-            if authorized: await ready()
+            if authorized:
+                if not await ready(): return
             else: self.stage.emit('phone')
             while not self.stopping:
                 while not self.commands.empty():
@@ -177,17 +183,22 @@ class TelegramWorker(QThread):
                         if name=='stop': self.stopping=True
                         elif name=='select' and authorized: self.selected=value; self.status.emit('Đang nhận ảnh mới từ nhóm ID '+str(value))
                         elif name=='phone' and not authorized:
-                            phone=value.strip(); await client.send_code_request(phone); self.stage.emit('code')
+                            phone=normalize_phone(value)
+                            if not allowed_account(phone):
+                                self.status.emit('Số điện thoại không được phép. Chỉ dùng tài khoản được cấp phép.'); self.stage.emit('phone'); continue
+                            await client.send_code_request('+'+phone); self.stage.emit('code')
                         elif name=='code' and not authorized:
                             try: await client.sign_in(phone=phone,code=value.strip())
                             except errors.SessionPasswordNeededError: self.stage.emit('password'); continue
-                            authorized=True; await ready()
+                            authorized=True
+                            if not await ready(): return
                         elif name=='password' and not authorized:
-                            await client.sign_in(password=value); authorized=True; await ready()
-                        elif name=='refresh' and authorized: await ready()
+                            await client.sign_in(password=value); authorized=True
+                            if not await ready(): return
+                        elif name=='refresh' and authorized:
+                            if not await ready(): return
                     except errors.FloodWaitError as exc: self.status.emit('Telegram yêu cầu chờ '+str(exc.seconds)+' giây trước khi thử lại.')
                     except Exception as exc: self.status.emit('Chưa thực hiện được ('+type(exc).__name__+'). Kiểm tra lại và thử lại.')
                 await asyncio.sleep(.15)
         finally:
             await client.disconnect()
-

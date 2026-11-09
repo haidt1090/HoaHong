@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 import httpx
 from telegram_source import TelegramWorker,bot_media
+from telegram_access import phone_fingerprint
 
 class MediaTests(unittest.TestCase):
     def test_largest_photo(self):
@@ -61,7 +62,7 @@ class AccountTests(unittest.TestCase):
                 async def sign_in(self,**kwargs):
                     if 'code' in kwargs: calls.append('code'); raise errors.SessionPasswordNeededError(request=None)
                     calls.append('password')
-                async def get_me(self): return SimpleNamespace(id=99)
+                async def get_me(self): return SimpleNamespace(id=99,phone='84900000000')
                 async def iter_dialogs(self):
                     yield SimpleNamespace(is_group=True,entity='entity',name='Ảnh')
                 def add_event_handler(self,handler,event): self.handler=handler
@@ -69,7 +70,7 @@ class AccountTests(unittest.TestCase):
                     Path(file).write_bytes(b'image'); calls.append('download')
             client=Client()
             def stage(value):
-                if value=='phone': worker.command('phone','+84000000000')
+                if value=='phone': worker.command('phone','+84900000000')
                 elif value=='code': worker.command('code','12345')
                 elif value=='password': worker.command('password','fake')
                 elif value=='ready':
@@ -82,10 +83,9 @@ class AccountTests(unittest.TestCase):
                         worker.command('stop')
                     client.driver=asyncio.create_task(drive())
             worker.stage.connect(stage)
-            with patch('telethon.TelegramClient',return_value=client),patch('telethon.utils.get_peer_id',return_value=-1001): asyncio.run(worker.account())
+            with patch('telethon.TelegramClient',return_value=client),patch('telethon.utils.get_peer_id',return_value=-1001),patch('telegram_access.ACCOUNT_FINGERPRINT',phone_fingerprint('84900000000')): asyncio.run(worker.account())
             self.assertEqual(calls,['phone','code','password','download','disconnect'])
             self.assertEqual(len(list(Path(d).rglob('*.jpg'))),1)
             worker.db.close()
 
 if __name__=='__main__': unittest.main()
-

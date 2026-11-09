@@ -16,7 +16,7 @@ class TelegramDialog(QDialog):
         self.api_id=QLineEdit(); self.api_hash=QLineEdit(); self.api_hash.setEchoMode(QLineEdit.EchoMode.Password)
         self.auth=QLineEdit(); self.auth.setPlaceholderText('Số điện thoại dạng +84…')
         self.group=QComboBox(); self.group.setMinimumContentsLength(30)
-        self.info=QLabel('Bot: chỉ cho phép @pkhoahongbot, lấy token từ @BotFather. Tài khoản: lấy API ID và API Hash tại my.telegram.org.'); self.info.setWordWrap(True)
+        self.info=QLabel('Chỉ cho phép bot @pkhoahongbot hoặc tài khoản được cấp phép. Token/API ID và Hash được kiểm tra với Telegram.'); self.info.setWordWrap(True)
         self.state=QLabel('Chưa kết nối'); self.state.setWordWrap(True)
         self.form=QFormLayout(); self.form.addRow('Chế độ',self.mode); self.form.addRow('Bot token',self.token)
         self.form.addRow('API ID',self.api_id); self.form.addRow('API Hash',self.api_hash)
@@ -140,4 +140,3 @@ class TelegramDialog(QDialog):
     def closeEvent(self,event):
         # Configuration window is independent of the connection lifetime.
         event.accept()
-

@@ -5,18 +5,18 @@ Hiển thị ảnh thu nhỏ, chọn nhiều ảnh để in hàng loạt, tự �
 lưu kết nối và cài đặt in. Giấy A4/A5/A6, ảnh 3×4 hoặc 4×6 cm,
 1–999 bản mỗi ảnh, chọn máy in Windows, xem trước và xuất PDF.
 
-## Khóa bot
+## Bản 1.5.1: sửa cài đặt và giới hạn Telegram
 
-Chỉ bot @pkhoahongbot được kết nối, kiểm tra bằng username Telegram trả về.
-Phần khóa tài khoản theo số chưa nằm trong gói này, đang chờ lựa chọn bảo vệ thông tin riêng tư.
-
-## Sửa bộ cài 1.5.1
-
-Giữ đủ thư viện chạy và đóng gói trong requirements.txt, không bỏ zstandard/Nuitka.
-CAI_DAT.bat và DONG_GOI.bat dùng cùng Python 3.12 x64 và setup_environment.py.
-Pip dùng wheel zstandard 0.25.0 cp312-win_amd64, không tự biên dịch zstandard bằng MSVC.
-Nếu chưa có Python 3.12 x64, cài bản 64-bit từ python.org trước.
-Môi trường cũ sai phiên bản được giữ lại ở .venv-old-...; dữ liệu ứng dụng không bị xóa.
+- Chỉ bot **@pkhoahongbot** được kết nối; xác minh username từ Telegram `getMe`, không dựa vào token bạn tự đặt tên.
+- Chỉ tài khoản được cấp phép được dùng; số gốc không ghi trong source, chỉ giữ dấu scrypt một chiều kèm salt ngẫu nhiên. Kiểm tra số nhập trước khi xin mã và kiểm tra lại số Telegram trả về
+  sau đăng nhập/khôi phục phiên. Phiên của số khác bị từ chối trước khi đọc nhóm hoặc tải ảnh.
+- `CAI_DAT.bat` và `DONG_GOI.bat` dùng cùng Python **3.12 x64** và cài **đầy đủ requirements.txt**,
+  không bỏ thư viện đóng gói. `zstandard==0.25.0` có wheel cp312-cp312-win_amd64;
+  pip được yêu cầu dùng wheel, không tự biên dịch zstandard bằng Visual C++.
+- Nếu môi trường `.venv` cũ khác Python/bitness, đổi tên giữ lại `.venv-old-...` rồi tạo môi trường đúng;
+  không xóa ảnh, token hoặc dữ liệu ứng dụng trong LOCALAPPDATA.
+- Nếu chưa có Python 3.12 x64, cài bản Windows 64-bit tại python.org trước. Không dùng bản 3.14/3.15 cho bộ cài này.
+- Việc giới hạn danh tính nằm trong chương trình; source repo công khai vẫn có thể bị sửa bởi người có source.
 
 ## Bản 1.5: thông tin nhà phát triển và phím tắt
 
@@ -60,7 +60,7 @@ Bản cập nhật này chỉ có source; không tự tạo EXE và không tự 
 Các bản EXE 1.4 cũ không có chức năng mới của source 1.5.
 
 Sau khi test đạt, tự chạy **DONG_GOI.bat**. Cần Windows 10/11 x64, Python **3.12 x64**
-và Internet. Script tạo `.build-venv` riêng, cài requirements, biên dịch bằng **Nuitka + MinGW64**,
+và Internet. Script tạo `.build-venv` riêng, cài đầy đủ requirements qua cùng bộ cài môi trường, biên dịch bằng **Nuitka + MinGW64**,
 bỏ docstring/assert trong bản native, kiểm tra ứng dụng và tạo **dist/ChupAnh-Windows.zip**.
 Lần đầu có thể tải compiler và mất nhiều thời gian hơn PyInstaller.
 Máy nhận ZIP không cần Python; cần giải nén cả thư mục, không chép riêng EXE.
@@ -212,4 +212,3 @@ bố trí kích thước và kết xuất PDF bằng luồng in thực. Có ki�
 Offline, SetJob, lỗi quyền, lỗi đọc queue, khôi phục mã lệnh sau khởi động lại.
 Chưa kiểm chứng bằng bot/tài khoản và máy in Windows thật trong môi trường phát triển.
 Đây là mã nguồn Python kèm tệp .bat, chưa phải bộ cài .exe.
-
