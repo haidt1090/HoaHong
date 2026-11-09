@@ -2,6 +2,7 @@
 import asyncio, json, queue, sqlite3, re
 from pathlib import Path
 from PySide6.QtCore import QThread, Signal
+from telegram_access import allowed_bot
 
 class BotAPIError(Exception):
     def __init__(self,code): self.code=code
@@ -75,7 +76,10 @@ class TelegramWorker(QThread):
                 self.drain()
                 if self.stopping: return
                 try:
-                    me=await api('getMe'); self.identity=str(me['id'])
+                    me=await api('getMe')
+                    if not allowed_bot(me):
+                        self.status.emit('Từ chối kết nối: phần mềm chỉ cho phép bot @pkhoahongbot.'); self.stage.emit('error'); return
+                    self.identity=str(me['id'])
                     webhook=await api('getWebhookInfo')
                     if webhook.get('url'):
                         self.status.emit('Bot đang dùng webhook. Tắt webhook ở dịch vụ đang dùng hoặc tạo bot riêng; phần mềm không tự xóa webhook.')
@@ -186,3 +190,4 @@ class TelegramWorker(QThread):
                 await asyncio.sleep(.15)
         finally:
             await client.disconnect()
+

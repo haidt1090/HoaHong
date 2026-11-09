@@ -5,6 +5,11 @@ Hiển thị ảnh thu nhỏ, chọn nhiều ảnh để in hàng loạt, tự �
 lưu kết nối và cài đặt in. Giấy A4/A5/A6, ảnh 3×4 hoặc 4×6 cm,
 1–999 bản mỗi ảnh, chọn máy in Windows, xem trước và xuất PDF.
 
+## Khóa bot
+
+Chỉ bot @pkhoahongbot được kết nối, kiểm tra bằng username Telegram trả về.
+Phần khóa tài khoản theo số chưa nằm trong gói này, đang chờ lựa chọn bảo vệ thông tin riêng tư.
+
 ## Sửa bộ cài 1.5.1
 
 Giữ đủ thư viện chạy và đóng gói trong requirements.txt, không bỏ zstandard/Nuitka.

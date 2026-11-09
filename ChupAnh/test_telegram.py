@@ -20,7 +20,7 @@ class MediaTests(unittest.TestCase):
                 return {'message_id':message_id,'chat':{'id':chat_id,'type':'supergroup','title':'Test'},'photo':[{'file_id':'pic','file_size':3}]}
             def handler(request):
                 path=request.url.path
-                if path.endswith('getMe'): return httpx.Response(200,json={'ok':True,'result':{'id':123}})
+                if path.endswith('getMe'): return httpx.Response(200,json={'ok':True,'result':{'id':123,'username':'pkhoahongbot'}})
                 if path.endswith('getWebhookInfo'): return httpx.Response(200,json={'ok':True,'result':{'url':''}})
                 if path.endswith('getUpdates'):
                     counters['polls']+=1; offsets.append(json.loads(request.content)['offset'])
@@ -88,3 +88,4 @@ class AccountTests(unittest.TestCase):
             worker.db.close()
 
 if __name__=='__main__': unittest.main()
+

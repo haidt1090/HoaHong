@@ -57,6 +57,10 @@ class AppTests(unittest.TestCase):
             if w.print_worker: self.finish_print(w)
             if not w.closed: w.close()
         self.qt.processEvents()
+        import shiboken6
+        for window in self.windows:
+            if shiboken6.isValid(window): shiboken6.delete(window)
+        self.windows.clear(); self.window=None; self.qt.processEvents()
         for p in reversed(self.patches): p.stop()
         self.temp.cleanup()
     def test_thumbnails_checkbox_batch_selection_and_manual_print(self):
