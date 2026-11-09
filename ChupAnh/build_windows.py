@@ -1,5 +1,6 @@
 """Manually compile to native Windows code; no user data or secrets are bundled."""
-import argparse,shutil,subprocess,sys
+import argparse,shutil,subprocess,sys,struct
+from setup_environment import install_requirements
 from pathlib import Path
 
 def compiler_command(root):
@@ -18,10 +19,10 @@ def main():
     parser=argparse.ArgumentParser(description='Dong goi native ChupAnh bang Nuitka (thu cong)')
     parser.add_argument('--skip-install',action='store_true'); args=parser.parse_args()
     if sys.platform!='win32': raise SystemExit('Dong goi chi chay tren Windows x64, khong build tu dong.')
-    if sys.version_info[:2]!=(3,12): raise SystemExit('Dung Python 3.12 x64 de dong goi; chay DONG_GOI.bat.')
+    if sys.version_info[:2]!=(3,12) or struct.calcsize('P')!=8: raise SystemExit('Dung Python 3.12 x64 de dong goi; chay DONG_GOI.bat.')
     root=Path(__file__).resolve().parent
     if not args.skip_install:
-        subprocess.run([sys.executable,'-m','pip','install','-r',str(root/'requirements.txt')],cwd=root,check=True)
+        install_requirements(sys.executable,root)
     subprocess.run(compiler_command(root),cwd=root,check=True)
     candidates=list((root/'build'/'nuitka').glob('*.dist/ChupAnh.exe'))
     if not candidates: raise RuntimeError('Khong tim thay EXE sau bien dich Nuitka')

@@ -22,7 +22,7 @@ GALLERY_LIMIT=100
 
 class Window(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('Telegram Photo Print 1.5 — Windows'); self.resize(1040,820)
+        super().__init__(); self.setWindowTitle('Telegram Photo Print 1.5.1 — Windows'); self.resize(1040,820)
         self.db=sqlite3.connect(BASE/'history.sqlite')
         self.db.execute('CREATE TABLE IF NOT EXISTS jobs (digest TEXT PRIMARY KEY,state TEXT,file TEXT)')
         self.db.execute('CREATE TABLE IF NOT EXISTS images (digest TEXT PRIMARY KEY,path TEXT,added REAL)')

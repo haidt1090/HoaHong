@@ -11,3 +11,5 @@ dist/
 *.spec
 application.lock
 .build-venv/
+.venv-old-*/
+.build-venv-old-*/

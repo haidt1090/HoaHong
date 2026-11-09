@@ -1,9 +1,17 @@
-# ChupAnh — Telegram Photo Print 1.5 cho Windows
+# ChupAnh — Telegram Photo Print 1.5.1 cho Windows
 
 Nhận ảnh bằng Bot hoặc tài khoản Telegram qua API, không auto click.
 Hiển thị ảnh thu nhỏ, chọn nhiều ảnh để in hàng loạt, tự động in ảnh mới,
 lưu kết nối và cài đặt in. Giấy A4/A5/A6, ảnh 3×4 hoặc 4×6 cm,
 1–999 bản mỗi ảnh, chọn máy in Windows, xem trước và xuất PDF.
+
+## Sửa bộ cài 1.5.1
+
+Giữ đủ thư viện chạy và đóng gói trong requirements.txt, không bỏ zstandard/Nuitka.
+CAI_DAT.bat và DONG_GOI.bat dùng cùng Python 3.12 x64 và setup_environment.py.
+Pip dùng wheel zstandard 0.25.0 cp312-win_amd64, không tự biên dịch zstandard bằng MSVC.
+Nếu chưa có Python 3.12 x64, cài bản 64-bit từ python.org trước.
+Môi trường cũ sai phiên bản được giữ lại ở .venv-old-...; dữ liệu ứng dụng không bị xóa.
 
 ## Bản 1.5: thông tin nhà phát triển và phím tắt
 
@@ -102,7 +110,7 @@ Các thao tác Windows cần quyền truy cập lệnh in tương ứng; lỗi q
 2. Thoát hẳn bản cũ; chỉ chạy một ứng dụng nhận cùng một bot.
 3. Giải nén toàn bộ gói mới vào thư mục có quyền ghi.
 4. Chạy `CAI_DAT.bat` một lần, kể cả khi nâng cấp (bản mới dùng thêm keyring).
-5. Chạy `MO_UNG_DUNG.bat`. Tiêu đề phải có số **1.5**.
+5. Chạy `MO_UNG_DUNG.bat`. Tiêu đề phải có số **1.5.1**.
 6. Cài driver máy in thật trên Windows trước khi in ra giấy. OneNote và các máy in PDF
    là máy in ảo. Với Microsoft Print to PDF, phần mềm chuyển sang xuất PDF trực tiếp để tránh hộp thoại driver bị treo.
 
@@ -199,3 +207,4 @@ bố trí kích thước và kết xuất PDF bằng luồng in thực. Có ki�
 Offline, SetJob, lỗi quyền, lỗi đọc queue, khôi phục mã lệnh sau khởi động lại.
 Chưa kiểm chứng bằng bot/tài khoản và máy in Windows thật trong môi trường phát triển.
 Đây là mã nguồn Python kèm tệp .bat, chưa phải bộ cài .exe.
+

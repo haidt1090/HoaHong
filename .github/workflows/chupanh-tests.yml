@@ -25,6 +25,10 @@ jobs:
           architecture: x64
           cache: pip
           cache-dependency-path: ChupAnh/requirements.txt
-      - run: python -m pip install -r requirements.txt
+      - name: Test the actual full installer
+        shell: cmd
+        run: call CAI_DAT.bat
+        env:
+          CHUPANH_NONINTERACTIVE: '1'
       - name: Test source without packaging
-        run: python -m unittest discover -v
+        run: .\.venv\Scripts\python.exe -m unittest discover -v
