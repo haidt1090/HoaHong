@@ -122,7 +122,7 @@ class TelegramDialog(QDialog):
     def receive(self,path):
         if self.active:
             from pathlib import Path
-            if self.owner.enqueue(Path(path),self.owner.auto.isChecked()):
+            if self.owner.enqueue(Path(path),self.owner.auto.isChecked(),allow_hidden=True,occurrence='telegram:'+str(Path(path).resolve())):
                 # Do not change the user's manual batch selection as new photos arrive.
                 self.update_status('Đã nhận ảnh: '+Path(path).name+(' — đã bật in tự động.' if self.owner.auto.isChecked() else ' — chờ bạn bấm in.'))
     def stop(self):

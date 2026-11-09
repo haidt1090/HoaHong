@@ -46,7 +46,7 @@ class Worker(QObject):
 class Owner(QWidget):
     def __init__(self):
         super().__init__(); self.auto=QCheckBox(); self.status=QLabel(); self.list=QListWidget(); self.received=[]
-    def enqueue(self,path,auto): self.received.append((path,auto)); self.list.addItem(str(path)); return True
+    def enqueue(self,path,auto,**kwargs): self.received.append((path,auto)); self.list.addItem(str(path)); return True
 
 class DialogTests(unittest.TestCase):
     @classmethod

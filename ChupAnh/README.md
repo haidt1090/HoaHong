@@ -1,11 +1,36 @@
-# ChupAnh — Telegram Photo Print 1.4 cho Windows
+# ChupAnh — Telegram Photo Print 1.5 cho Windows
 
 Nhận ảnh bằng Bot hoặc tài khoản Telegram qua API, không auto click.
 Hiển thị ảnh thu nhỏ, chọn nhiều ảnh để in hàng loạt, tự động in ảnh mới,
 lưu kết nối và cài đặt in. Giấy A4/A5/A6, ảnh 3×4 hoặc 4×6 cm,
 1–999 bản mỗi ảnh, chọn máy in Windows, xem trước và xuất PDF.
 
-## Bản 1.4: khung kéo giãn, ảnh mới trước và bản EXE
+## Bản 1.5: thông tin nhà phát triển và phím tắt
+
+PHÒNG KHÁM ĐA KHOA Y CAO HOA HỒNG  
+CÔNG TY TNHH DỊCH VỤ VÀ Y TẾ HUỆ LINH
+
+Hai dòng trên hiển thị trên cùng cửa sổ chính. Bấm nút **?** trên thanh trên cùng hoặc **F1** để xem hướng dẫn.
+
+| Phím | Thao tác |
+|---|---|
+| Alt+1 … Alt+9 | In ngay ảnh ở vị trí 1 … 9 tính từ ảnh mới nhất, từ trái qua phải rồi xuống hàng |
+| Alt+A | In tất cả ảnh mới **chưa gửi in**, bỏ qua ảnh đã gửi, đang chờ/in, đã xuất PDF hoặc cần kiểm tra |
+| F1 | Mở hướng dẫn phím tắt |
+
+Phím tắt chỉ có tác dụng khi cửa sổ chính đang được sử dụng; không đổi các ảnh đang tích chọn.
+Dùng cấu hình máy in, khổ giấy, kích thước và số bản hiện tại. Nếu chọn PDF vẫn hỏi nơi lưu.
+Ảnh có tác vụ chưa rõ kết quả cần xác nhận trước khi in lại bằng Alt+số.
+
+Mỗi tin nhắn ảnh mới từ Telegram là một lượt riêng: copy/gửi lại ảnh cũ sẽ thêm ô ảnh mới
+và có thể tự in tiếp. Cùng một tin nhắn được Telegram gửi lại khi kết nối lại không bị thêm/in trùng.
+Thư viện vẫn giữ tối đa 100 lượt ảnh; có thể có nhiều ô cùng nội dung từ các tin nhắn khác nhau.
+
+Đã bỏ nhãn trạng thái và thanh tiến độ lớn phía trên bảng; theo dõi trực tiếp trong các cột.
+**Xóa tất cả tiến độ** xóa toàn bộ lịch sử đã kết thúc, kể cả dòng cũ không còn hiện trong bảng.
+Nút này giữ nguyên các lệnh đang chờ/in trong phần mềm và Windows, file ảnh và chống in trùng.
+
+## Khung ảnh và thư viện
 
 - Kéo thanh phân cách ngang giữa khung ảnh và tiến độ để thay đổi chiều cao hai khung.
   Tiến độ mặc định nhỏ hơn; bấm **Lưu cài đặt** để nhớ tỷ lệ khung.
@@ -17,17 +42,25 @@ lưu kết nối và cài đặt in. Giấy A4/A5/A6, ảnh 3×4 hoặc 4×6 cm,
   Hai nút không xóa file, không hủy lệnh in và không xóa bảng tiến độ.
   Ảnh đã dọn không tự xuất hiện lại; dùng **Thêm ảnh** để đưa chúng vào khung lại nếu cần.
 
-## Tải bản chạy không cần Python
-Tải **ChupAnh-Windows.zip** từ GitHub Releases của repo, giải nén toàn bộ,
-mở **ChupAnh/ChupAnh.exe**. Giữ thư mục `_internal` đi kèm, không chỉ chép riêng EXE.
-Bản chạy sử dụng cùng dữ liệu và kết nối đã lưu của bản Python trên máy.
+## Đóng gói thủ công sau khi test source
+Bản cập nhật này chỉ có source; không tự tạo EXE và không tự đăng bản build lên Releases.
+Các bản EXE 1.4 cũ không có chức năng mới của source 1.5.
 
-## Tự đóng gói Windows
-Chạy **DONG_GOI.bat** trong bộ source. Script cài thư viện cần thiết, dùng PyInstaller
-đóng gói, tự kiểm tra bản EXE bằng dữ liệu tạm và tạo **dist/ChupAnh-Windows.zip**.
-Cần Windows, Python 3.11+ và Internet ở máy build. Máy nhận ZIP không cần cài Python.
-Bộ đóng gói không đưa token, ảnh người dùng hoặc dữ liệu `%LOCALAPPDATA%` vào ZIP.
-GitHub Actions cũng build và kiểm tra bản EXE trên Windows khi cập nhật source.
+Sau khi test đạt, tự chạy **DONG_GOI.bat**. Cần Windows 10/11 x64, Python **3.12 x64**
+và Internet. Script tạo `.build-venv` riêng, cài requirements, biên dịch bằng **Nuitka + MinGW64**,
+bỏ docstring/assert trong bản native, kiểm tra ứng dụng và tạo **dist/ChupAnh-Windows.zip**.
+Lần đầu có thể tải compiler và mất nhiều thời gian hơn PyInstaller.
+Máy nhận ZIP không cần Python; cần giải nén cả thư mục, không chép riêng EXE.
+Bộ đóng gói không đưa token, ảnh hoặc dữ liệu `%LOCALAPPDATA%` vào ZIP.
+
+Nuitka biên dịch mã thành native để khó trích lại mã Python hơn; không phải mã hóa hay
+chống đảo ngược tuyệt đối. Repo GitHub hiện công khai nên source vẫn xem được trên GitHub.
+Không thay đổi quyền riêng tư repo trong cập nhật này.
+
+GitHub chỉ build nếu bạn chủ động **Run workflow** tại `ChupAnh - Manual Windows Build`.
+Push source không tạo EXE; nếu bật kiểm tra source thì chỉ chạy kiểm tra, không đóng gói.
+Môi trường, phiên bản thư viện, compiler và yêu cầu ngoài pip đều ghi trong **requirements.txt**;
+`requirements-build.txt` chỉ trỏ về file đó để tương thích bộ hướng dẫn cũ.
 
 ## Các chức năng in và hàng đợi Windows: in tay, PDF và hàng đợi Windows
 
@@ -44,7 +77,7 @@ GitHub Actions cũng build và kiểm tra bản EXE trên Windows khi cập nh�
   hoặc gửi `SetJob(JOB_CONTROL_DELETE)` tới đúng mã lệnh trong Windows Print Spooler.
   Không dùng PurgePrinter và không xóa tác vụ của chương trình khác.
 - **Mở hàng đợi Windows** mở cửa sổ queue của máy in ở dòng đang chọn.
-- **Xóa tiến độ đã xong** chỉ xóa dòng lịch sử đã kết thúc; không xóa ảnh,
+- **Xóa tất cả tiến độ** chỉ xóa dòng lịch sử đã kết thúc; không xóa ảnh,
   không xóa lịch sử chống in trùng và không giấu tác vụ còn treo trong Windows.
 - Nhớ mã lệnh và tên tài liệu riêng để mở lại vẫn theo dõi/hủy được tác vụ của bản này.
 
@@ -65,11 +98,11 @@ Nếu thiếu thư viện hoặc chưa xác minh được queue, phần mềm kh
 Các thao tác Windows cần quyền truy cập lệnh in tương ứng; lỗi quyền được hiển thị.
 
 ## Cài đặt / nâng cấp bản source Python
-1. Cài Python 3.11+ từ python.org, chọn Add Python to PATH.
+1. Cài Python 3.12 x64 từ python.org, chọn Add Python to PATH (môi trường khuyến nghị đã ghi trong requirements).
 2. Thoát hẳn bản cũ; chỉ chạy một ứng dụng nhận cùng một bot.
 3. Giải nén toàn bộ gói mới vào thư mục có quyền ghi.
 4. Chạy `CAI_DAT.bat` một lần, kể cả khi nâng cấp (bản mới dùng thêm keyring).
-5. Chạy `MO_UNG_DUNG.bat`. Tiêu đề phải có số **1.4**.
+5. Chạy `MO_UNG_DUNG.bat`. Tiêu đề phải có số **1.5**.
 6. Cài driver máy in thật trên Windows trước khi in ra giấy. OneNote và các máy in PDF
    là máy in ảo. Với Microsoft Print to PDF, phần mềm chuyển sang xuất PDF trực tiếp để tránh hộp thoại driver bị treo.
 
@@ -129,7 +162,8 @@ Nếu máy in đã lưu không còn khả dụng, chọn lại máy in trước 
 
 Lề 7 mm, khoảng cách 3 mm. Giữ toàn bộ ảnh, không cắt; có thể có viền trắng nếu khác tỷ lệ khung.
 Driver có thể co giãn hoặc thay khổ; kiểm tra bằng thước trên bản in thử.
-Chống tải trùng theo tài khoản/nhóm/tin nhắn, chống tự in trùng theo SHA-256 của nội dung.
+Chống tải/in trùng cho cùng tin nhắn Telegram; tin nhắn mới gửi lại cùng nội dung vẫn được nhận và in tiếp.
+Nguồn thư mục/nhập tay vẫn nhận diện trùng theo SHA-256 nội dung.
 In tay vẫn có thể in lại theo hộp xác nhận. Gửi máy in chưa có nghĩa giấy đã ra.
 Lỗi in sẽ dừng tự động, đánh dấu cần kiểm tra và không tự in lại để tránh ra giấy hai lần.
 Trạng thái chờ bị sót sau gián đoạn được đưa về cần kiểm tra, không khóa in tay vĩnh viễn.

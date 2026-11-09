@@ -1,5 +1,19 @@
-PySide6>=6.7,<7
-Telethon>=1.36,<2
-httpx>=0.27,<1
-keyring>=25,<26
-pywin32>=306; sys_platform == "win32"
+# CHUPANH 1.5 — môi trường được ghi lại để cài đặt và đóng gói sau này.
+# Hệ điều hành sử dụng đầy đủ: Windows 10/11 x64; Python khuyến nghị: CPython 3.12 x64.
+# Chạy source: .venv; đóng gói thủ công: .build-venv (DONG_GOI.bat dùng Python 3.12).
+# Giao diện, in/PDF, Telegram, HTTP và Windows Credential Manager:
+PySide6==6.12.0
+Telethon==1.45.0
+httpx==0.28.1
+keyring==25.7.0
+pywin32==312; sys_platform == "win32"
+# Bộ đóng gói native để bạn tự chạy sau khi test. Không có bước build khi mở ứng dụng.
+Nuitka==4.3.5; sys_platform == "win32"
+ordered-set>=4.1,<5; sys_platform == "win32"
+zstandard>=0.23,<1; sys_platform == "win32"
+# Ngoài pip: driver máy in; Internet để kết nối Telegram/cài thư viện.
+# Khi chạy DONG_GOI.bat: Nuitka có thể tải MinGW64 và công cụ biên dịch lần đầu.
+# Không cần Visual Studio khi dùng MinGW64. Máy nhận bản standalone không cần Python.
+# Kiểm tra source: python -m unittest discover -v (unittest thuộc thư viện chuẩn).
+# Các thư viện chuẩn còn dùng: asyncio, sqlite3, hashlib, pathlib, threading,
+# concurrent.futures, tempfile, json, shutil, subprocess, uuid, argparse, os, sys.

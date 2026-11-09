@@ -1,2 +1,2 @@
+# Giữ tên file này để tương thích hướng dẫn cũ. Toàn bộ yêu cầu ở requirements.txt.
 -r requirements.txt
-PyInstaller>=6.11,<7

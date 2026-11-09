@@ -188,7 +188,7 @@ class AppTests(unittest.TestCase):
         w=self.window; w.enqueue(self.photo('one.png','red'),False); w.check_all(True)
         w.send_batch(w.selected_entries(),pdf_output=str(self.base/'progress.pdf')); self.qt.processEvents()
         worker=w.print_worker; worker.progress.emit(2,4,str(self.base/'one.png')); self.qt.processEvents()
-        self.assertEqual(w.progress_bar.value(),2); self.assertIn('one.png',w.progress_label.text())
+        self.assertEqual(w.queue_table.topLevelItem(0).text(2),'2/4'); self.assertEqual(w.queue_table.topLevelItem(0).text(1),'one.png')
         w.pause_printing(); self.assertTrue(worker.paused); self.assertTrue(w.queue_paused)
         w.resume_printing(); self.assertFalse(worker.paused); self.assertFalse(w.queue_paused)
         w.clear_progress(); self.assertEqual(w.queue_table.topLevelItemCount(),1)
@@ -278,4 +278,48 @@ class AppTests(unittest.TestCase):
         w=self.window; path=self.photo('clear.png','blue'); w.enqueue(path,False); w.clear_gallery(); w.close()
         restored=self.new_window(); self.assertEqual(restored.list.count(),0)
         restored.enqueue(path,False); self.assertEqual(restored.list.count(),0); self.assertTrue(path.exists())
+    def test_alt_digit_shortcuts_print_latest_without_changing_selection(self):
+        from PySide6.QtTest import QTest
+        w=self.window; old=self.photo('old.png','red'); new=self.photo('new.png','blue')
+        w.enqueue(old,False); w.enqueue(new,False); w.list.item(1).setCheckState(Qt.CheckState.Checked)
+        w.show(); w.activateWindow(); w.list.setFocus(); self.qt.processEvents()
+        with patch.object(QMessageBox,'question',side_effect=AssertionError('Normal hotkey must print immediately')):
+            QTest.keyClick(w.list,Qt.Key.Key_1,Qt.KeyboardModifier.AltModifier); self.qt.processEvents()
+            self.assertIsNotNone(w.print_worker); self.assertEqual(w.print_worker.paths,[new]); self.finish_print(w)
+            QTest.keyClick(w.list,Qt.Key.Key_2,Qt.KeyboardModifier.AltModifier); self.qt.processEvents()
+            self.assertEqual(w.print_worker.paths,[old]); self.finish_print(w)
+        self.assertEqual([path for path,_ in w.selected_entries()],[old])
+    def test_alt_a_only_prints_new_unsubmitted_images(self):
+        w=self.window
+        for name,color in [('done.png','red'),('new1.png','blue'),('review.png','green'),('new2.png','yellow')]: w.enqueue(self.photo(name,color),False)
+        identities={Path(path).name:identity for identity,path in w.pending.items()}
+        w.db.execute('INSERT INTO jobs VALUES (?,?,?)',(identities['done.png'],'submitted',str(self.base/'done.png')))
+        w.db.execute('INSERT INTO jobs VALUES (?,?,?)',(identities['review.png'],'review',str(self.base/'review.png'))); w.db.commit()
+        with patch.object(QMessageBox,'question',side_effect=AssertionError('Alt+A must not ask about already-reviewed photos')):
+            w.print_all_new(); self.qt.processEvents()
+        self.assertEqual([path.name for path in w.print_worker.paths],['new2.png','new1.png'])
+        w.print_all_new(); self.assertEqual(len(w.print_queue),0); self.assertIn('Không có ảnh mới',w.status.text()); self.finish_print(w)
+    def test_missing_hotkey_position_does_not_print(self):
+        w=self.window; w.print_latest(9); self.assertIsNone(w.print_worker); self.assertIn('thứ 9',w.status.text())
+    def test_telegram_resend_same_bytes_creates_new_card_and_auto_job(self):
+        w=self.window; first=self.photo('10.jpg','red'); second=self.base/'11.jpg'; second.write_bytes(first.read_bytes())
+        w.telegram_dialog.active=True; w.auto.setChecked(True)
+        w.telegram_dialog.receive(str(first)); self.qt.processEvents(); w.telegram_dialog.receive(str(second)); self.qt.processEvents()
+        self.assertEqual(w.list.count(),2); self.assertEqual(w.list.item(0).text(),'11.jpg')
+        self.assertEqual(len(w.print_queue),1); self.assertEqual(w.db.execute('SELECT COUNT(*) FROM jobs').fetchone()[0],2)
+        w.telegram_dialog.receive(str(second)); self.assertEqual(w.list.count(),2); self.assertEqual(len(w.print_queue),1)
+        self.finish_print(w); self.finish_print(w); w.close()
+        restored=self.new_window(); self.assertEqual(restored.list.count(),2)
+        self.assertEqual([restored.list.item(i).text() for i in range(2)],['11.jpg','10.jpg'])
+    def test_clear_all_progress_deletes_finished_history_beyond_visible_limit(self):
+        w=self.window
+        for index in range(120):
+            w.db.execute('INSERT INTO print_runs VALUES (?,?,?,?,?,?,?,?,?,?,?)',(f'old-{index}',float(index),'old','exported',4,4,'photo.jpg','PDF','out.pdf','old-doc',None))
+        w.db.execute('INSERT INTO print_runs VALUES (?,?,?,?,?,?,?,?,?,?,?)',('hold',999.,'pending','spool_wait',4,4,'photo.jpg','RICOH','','hold-doc',71)); w.db.commit()
+        w.clear_progress()
+        self.assertEqual(w.db.execute('SELECT id FROM print_runs').fetchall(),[('hold',)])
+    def test_folder_scan_does_not_duplicate_a_live_telegram_path(self):
+        w=self.window; path=self.photo('10.jpg','red'); w.telegram_dialog.active=True
+        w.telegram_dialog.receive(str(path)); self.assertEqual(w.list.count(),1)
+        w.enqueue(path,False); self.assertEqual(w.list.count(),1)
 if __name__=='__main__': unittest.main()
