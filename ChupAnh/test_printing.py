@@ -26,7 +26,8 @@ class RealPrintThreadTests(unittest.TestCase):
             settings={'paper':'A6','photo':'4 × 6 cm','count':17,'printer':'unused','pdf_output':str(output)}
             worker=printing.PrintWorker([path],settings); worker.start()
             self.assertTrue(worker.wait(10000)); self.assertIsNone(worker.error)
-            pdf=QPdfDocument(); pdf.load(str(output)); self.assertEqual(pdf.pageCount(),5); pdf.close()
+            pdf=QPdfDocument(); pdf.load(str(output)); self.assertEqual(pdf.pageCount(),5); pdf.close(); del pdf
+            self.qt.processEvents()
 
 class ControlledPrintTests(unittest.TestCase):
     @classmethod
