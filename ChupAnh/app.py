@@ -22,7 +22,7 @@ GALLERY_LIMIT=100
 
 class Window(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('Telegram Photo Print 1.5.1 — Windows'); self.resize(1040,820)
+        super().__init__(); self.setWindowTitle('Telegram Photo Print 1.5.2 — Windows'); self.resize(1040,820)
         self.db=sqlite3.connect(BASE/'history.sqlite')
         self.db.execute('CREATE TABLE IF NOT EXISTS jobs (digest TEXT PRIMARY KEY,state TEXT,file TEXT)')
         self.db.execute('CREATE TABLE IF NOT EXISTS images (digest TEXT PRIMARY KEY,path TEXT,added REAL)')
@@ -70,10 +70,15 @@ class Window(QMainWindow):
         root=QVBoxLayout()
         self.developer_label=QLabel('PHÒNG KHÁM ĐA KHOA Y CAO HOA HỒNG\nCÔNG TY TNHH DỊCH VỤ VÀ Y TẾ HUỆ LINH')
         self.developer_label.setAlignment(Qt.AlignmentFlag.AlignCenter); self.developer_label.setWordWrap(True)
-        self.developer_label.setStyleSheet('font-weight: 600; color: #23435e; padding: 6px; background: #f2f6fa;')
-        root.addWidget(self.developer_label); root.addLayout(form)
-        self.help_action=self.menuBar().addAction('?'); self.help_action.setToolTip('Hướng dẫn phím tắt (F1)')
-        self.help_action.setShortcut(QKeySequence('F1')); self.help_action.triggered.connect(self.show_hotkey_help)
+        self.developer_label.setStyleSheet('font-weight: 600; color: #23435e; padding: 2px;')
+        header=QWidget(); header.setStyleSheet('background: #f2f6fa;'); header_row=QHBoxLayout(header)
+        header_row.setContentsMargins(2,0,2,0); header_row.setSpacing(6); header_row.addSpacing(34)
+        header_row.addWidget(self.developer_label,1)
+        self.help_button=QPushButton('?'); self.help_button.setFixedSize(28,28); self.help_button.setToolTip('Hướng dẫn phím tắt (F1)')
+        self.help_button.clicked.connect(self.show_hotkey_help); header_row.addWidget(self.help_button)
+        self.help_shortcut=QShortcut(QKeySequence('F1'),self); self.help_shortcut.setAutoRepeat(False)
+        self.help_shortcut.activated.connect(self.show_hotkey_help)
+        root.addWidget(header); root.addLayout(form)
         self.hotkeys=[]
         for position in range(1,10):
             shortcut=QShortcut(QKeySequence(f'Alt+{position}'),self); shortcut.setAutoRepeat(False)
@@ -375,16 +380,12 @@ class Window(QMainWindow):
         if self.closing: QTimer.singleShot(0,self.close)
         else: QTimer.singleShot(0,self.start_next_print)
     def manual(self):
-        try: self.print_entries(self.selected_entries(),confirm=True)
+        try: self.print_entries(self.selected_entries())
         except Exception as exc: self.error(exc)
-    def print_entries(self,entries,confirm=True):
+    def print_entries(self,entries):
         entries=[entry for entry in entries if entry[1] not in self.active_digests()]
         if not entries:
             self.status.setText('Không có ảnh sẵn sàng in; ảnh đang xử lý sẽ không được xếp trùng.'); return
-        total=len(entries)*self.count.value()
-        review=sum(1 for _,digest in entries if self.db.execute('SELECT state FROM jobs WHERE digest=?',(digest,)).fetchone()==('review',))
-        warning=f'\n{review} ảnh có tác vụ trước chưa rõ kết quả; hãy kiểm tra hàng đợi Windows trước khi in lại.' if review else ''
-        if (confirm or review) and QMessageBox.question(self,'Xác nhận in',f'In {len(entries)} ảnh × {self.count.value()} bản = {total} ảnh, giấy {self.paper.currentText()}?'+warning)!=QMessageBox.StandardButton.Yes: return
         destination=None
         if is_pdf_printer(self.printer.currentText()):
             destination=self.ask_pdf_path()
@@ -396,7 +397,7 @@ class Window(QMainWindow):
         if self.list.count()<position:
             self.status.setText(f'Chưa có ảnh thứ {position} trong khung.'); return
         item=self.list.item(position-1)
-        try: self.print_entries([(Path(item.data(PATH_ROLE)),item.data(Qt.ItemDataRole.UserRole))],confirm=False)
+        try: self.print_entries([(Path(item.data(PATH_ROLE)),item.data(Qt.ItemDataRole.UserRole))])
         except Exception as exc: self.error(exc)
     def print_all_new(self):
         if self.closing: return
@@ -407,7 +408,7 @@ class Window(QMainWindow):
             if identity not in active and (not state or state[0]=='cancelled'):
                 entries.append((Path(item.data(PATH_ROLE)),identity))
         if not entries: self.status.setText('Không có ảnh mới chưa gửi in.'); return
-        try: self.print_entries(entries,confirm=False)
+        try: self.print_entries(entries)
         except Exception as exc: self.error(exc)
     def show_hotkey_help(self):
         QMessageBox.information(self,'Hướng dẫn phím tắt',
@@ -416,7 +417,7 @@ class Window(QMainWindow):
             'Alt+A: gửi in tất cả ảnh mới CHƯA gửi in; bỏ qua ảnh đang chờ, đã gửi, đã xuất PDF hoặc cần kiểm tra.\n'
             'F1 hoặc nút ?: mở hướng dẫn này.\n\n'
             'Phím tắt chỉ hoạt động khi cửa sổ chính đang được sử dụng. In theo máy in, khổ giấy, kích thước và số bản hiện tại. '
-            'Nếu chọn PDF, phần mềm hỏi vị trí lưu. Bấm phím tắt không thay đổi các ảnh đang tích chọn.\n'
+            'In tay và phím tắt gửi in ngay, không hỏi xác nhận. Nếu chọn PDF, phần mềm hỏi vị trí lưu. Bấm phím tắt không thay đổi các ảnh đang tích chọn.\n'
             'Xóa tất cả tiến độ chỉ xóa lịch sử đã kết thúc, giữ nguyên các lệnh đang chạy/chờ trong Windows.')
     def add_run(self,job):
         total=len(job['entries'])*job['settings']['count']; created=time.time()

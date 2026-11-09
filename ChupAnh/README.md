@@ -1,9 +1,16 @@
-# ChupAnh — Telegram Photo Print 1.5.1 cho Windows
+# ChupAnh — Telegram Photo Print 1.5.2 cho Windows
 
 Nhận ảnh bằng Bot hoặc tài khoản Telegram qua API, không auto click.
 Hiển thị ảnh thu nhỏ, chọn nhiều ảnh để in hàng loạt, tự động in ảnh mới,
 lưu kết nối và cài đặt in. Giấy A4/A5/A6, ảnh 3×4 hoặc 4×6 cm,
 1–999 bản mỗi ảnh, chọn máy in Windows, xem trước và xuất PDF.
+
+## Bản 1.5.2: hàng thông tin gọn hơn
+
+Gộp hai dòng thông tin nhà phát triển và nút ? vào cùng một hàng trên cùng.
+Bỏ hàng menu riêng, giảm khoảng đệm; F1 vẫn mở hướng dẫn phím tắt.
+In tay gửi in ngay khi bấm nút, bỏ hộp Yes/No kể cả tác vụ lần trước chưa rõ kết quả.
+Nếu chọn PDF vẫn cần chọn nơi lưu file. Lệnh đang thực sự chờ/in không được xếp trùng.
 
 ## Bản 1.5.1: sửa cài đặt và giới hạn Telegram
 
@@ -33,7 +40,7 @@ Hai dòng trên hiển thị trên cùng cửa sổ chính. Bấm nút **?** tr�
 
 Phím tắt chỉ có tác dụng khi cửa sổ chính đang được sử dụng; không đổi các ảnh đang tích chọn.
 Dùng cấu hình máy in, khổ giấy, kích thước và số bản hiện tại. Nếu chọn PDF vẫn hỏi nơi lưu.
-Ảnh có tác vụ chưa rõ kết quả cần xác nhận trước khi in lại bằng Alt+số.
+Alt+số và nút In ảnh đã chọn gửi in ngay, kể cả ảnh có tác vụ lần trước chưa rõ kết quả.
 
 Mỗi tin nhắn ảnh mới từ Telegram là một lượt riêng: copy/gửi lại ảnh cũ sẽ thêm ô ảnh mới
 và có thể tự in tiếp. Cùng một tin nhắn được Telegram gửi lại khi kết nối lại không bị thêm/in trùng.
@@ -115,7 +122,7 @@ Các thao tác Windows cần quyền truy cập lệnh in tương ứng; lỗi q
 2. Thoát hẳn bản cũ; chỉ chạy một ứng dụng nhận cùng một bot.
 3. Giải nén toàn bộ gói mới vào thư mục có quyền ghi.
 4. Chạy `CAI_DAT.bat` một lần, kể cả khi nâng cấp (bản mới dùng thêm keyring).
-5. Chạy `MO_UNG_DUNG.bat`. Tiêu đề phải có số **1.5.1**.
+5. Chạy `MO_UNG_DUNG.bat`. Tiêu đề phải có số **1.5.2**.
 6. Cài driver máy in thật trên Windows trước khi in ra giấy. OneNote và các máy in PDF
    là máy in ảo. Với Microsoft Print to PDF, phần mềm chuyển sang xuất PDF trực tiếp để tránh hộp thoại driver bị treo.
 
@@ -177,7 +184,7 @@ Lề 7 mm, khoảng cách 3 mm. Giữ toàn bộ ảnh, không cắt; có thể 
 Driver có thể co giãn hoặc thay khổ; kiểm tra bằng thước trên bản in thử.
 Chống tải/in trùng cho cùng tin nhắn Telegram; tin nhắn mới gửi lại cùng nội dung vẫn được nhận và in tiếp.
 Nguồn thư mục/nhập tay vẫn nhận diện trùng theo SHA-256 nội dung.
-In tay vẫn có thể in lại theo hộp xác nhận. Gửi máy in chưa có nghĩa giấy đã ra.
+In tay vẫn có thể in lại và không hỏi xác nhận. Gửi máy in chưa có nghĩa giấy đã ra.
 Lỗi in sẽ dừng tự động, đánh dấu cần kiểm tra và không tự in lại để tránh ra giấy hai lần.
 Trạng thái chờ bị sót sau gián đoạn được đưa về cần kiểm tra, không khóa in tay vĩnh viễn.
 

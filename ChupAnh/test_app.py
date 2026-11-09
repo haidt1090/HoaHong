@@ -326,4 +326,12 @@ class AppTests(unittest.TestCase):
         w=self.window; path=self.photo('10.jpg','red'); w.telegram_dialog.active=True
         w.telegram_dialog.receive(str(path)); self.assertEqual(w.list.count(),1)
         w.enqueue(path,False); self.assertEqual(w.list.count(),1)
+    def test_manual_print_never_asks_confirmation_even_for_review(self):
+        w=self.window; one=self.photo('review.png','red'); two=self.photo('new.png','blue')
+        w.enqueue(one,False); w.enqueue(two,False); w.check_all(True)
+        identity=next(identity for identity,path in w.pending.items() if Path(path)==one)
+        w.db.execute('INSERT INTO jobs VALUES (?,?,?)',(identity,'review',str(one))); w.db.commit()
+        with patch.object(QMessageBox,'question',side_effect=AssertionError('Manual printing must not ask Yes/No')):
+            w.manual(); self.qt.processEvents()
+        self.assertIsNotNone(w.print_worker); self.assertEqual(len(w.print_worker.paths),2); self.finish_print(w)
 if __name__=='__main__': unittest.main()
