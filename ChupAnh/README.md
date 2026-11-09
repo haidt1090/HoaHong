@@ -1,11 +1,35 @@
-# ChupAnh — Telegram Photo Print 1.3 cho Windows
+# ChupAnh — Telegram Photo Print 1.4 cho Windows
 
 Nhận ảnh bằng Bot hoặc tài khoản Telegram qua API, không auto click.
 Hiển thị ảnh thu nhỏ, chọn nhiều ảnh để in hàng loạt, tự động in ảnh mới,
 lưu kết nối và cài đặt in. Giấy A4/A5/A6, ảnh 3×4 hoặc 4×6 cm,
 1–999 bản mỗi ảnh, chọn máy in Windows, xem trước và xuất PDF.
 
-## Mới ở bản 1.3: in tay, PDF và hàng đợi Windows
+## Bản 1.4: khung kéo giãn, ảnh mới trước và bản EXE
+
+- Kéo thanh phân cách ngang giữa khung ảnh và tiến độ để thay đổi chiều cao hai khung.
+  Tiến độ mặc định nhỏ hơn; bấm **Lưu cài đặt** để nhớ tỷ lệ khung.
+- Ảnh mới và dòng tiến độ mới hiển thị trên cùng. Thứ tự xử lý lệnh in vẫn theo hàng chờ.
+- Nút **In ảnh đã chọn** to và đậm hơn.
+- Thư viện hiển thị và nhớ tối đa **100 ảnh mới nhất**. Ảnh cũ hơn được bỏ khỏi khung,
+  giữ nguyên file trên đĩa và lịch sử chống in trùng.
+- **Xóa ảnh đã chọn** bỏ các ảnh được tích; **Làm trống khung ảnh** dọn toàn bộ khung.
+  Hai nút không xóa file, không hủy lệnh in và không xóa bảng tiến độ.
+  Ảnh đã dọn không tự xuất hiện lại; dùng **Thêm ảnh** để đưa chúng vào khung lại nếu cần.
+
+## Tải bản chạy không cần Python
+Tải **ChupAnh-Windows.zip** từ GitHub Releases của repo, giải nén toàn bộ,
+mở **ChupAnh/ChupAnh.exe**. Giữ thư mục `_internal` đi kèm, không chỉ chép riêng EXE.
+Bản chạy sử dụng cùng dữ liệu và kết nối đã lưu của bản Python trên máy.
+
+## Tự đóng gói Windows
+Chạy **DONG_GOI.bat** trong bộ source. Script cài thư viện cần thiết, dùng PyInstaller
+đóng gói, tự kiểm tra bản EXE bằng dữ liệu tạm và tạo **dist/ChupAnh-Windows.zip**.
+Cần Windows, Python 3.11+ và Internet ở máy build. Máy nhận ZIP không cần cài Python.
+Bộ đóng gói không đưa token, ảnh người dùng hoặc dữ liệu `%LOCALAPPDATA%` vào ZIP.
+GitHub Actions cũng build và kiểm tra bản EXE trên Windows khi cập nhật source.
+
+## Các chức năng in và hàng đợi Windows: in tay, PDF và hàng đợi Windows
 
 - Tắt tự động vẫn chọn ảnh đã in để in lại bằng tay được; lịch sử không khóa in tay.
 - Chọn **Microsoft Print to PDF** hoặc **Xuất PDF trực tiếp**, bấm **In ảnh đã chọn**:
@@ -40,12 +64,12 @@ Bộ điều khiển Windows cần `pywin32`: **phải chạy lại CAI_DAT.bat 
 Nếu thiếu thư viện hoặc chưa xác minh được queue, phần mềm không báo đã in hoàn tất.
 Các thao tác Windows cần quyền truy cập lệnh in tương ứng; lỗi quyền được hiển thị.
 
-## Cài đặt / nâng cấp
+## Cài đặt / nâng cấp bản source Python
 1. Cài Python 3.11+ từ python.org, chọn Add Python to PATH.
 2. Thoát hẳn bản cũ; chỉ chạy một ứng dụng nhận cùng một bot.
 3. Giải nén toàn bộ gói mới vào thư mục có quyền ghi.
 4. Chạy `CAI_DAT.bat` một lần, kể cả khi nâng cấp (bản mới dùng thêm keyring).
-5. Chạy `MO_UNG_DUNG.bat`. Tiêu đề phải có số **1.3**.
+5. Chạy `MO_UNG_DUNG.bat`. Tiêu đề phải có số **1.4**.
 6. Cài driver máy in thật trên Windows trước khi in ra giấy. OneNote và các máy in PDF
    là máy in ảo. Với Microsoft Print to PDF, phần mềm chuyển sang xuất PDF trực tiếp để tránh hộp thoại driver bị treo.
 

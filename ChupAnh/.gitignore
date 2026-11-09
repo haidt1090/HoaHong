@@ -6,3 +6,7 @@ __pycache__/
 .env
 .env.*
 telegram-images/
+build/
+dist/
+*.spec
+application.lock

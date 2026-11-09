@@ -41,7 +41,8 @@ class AppTests(unittest.TestCase):
             patch('telegram_ui.ConnectionStore',side_effect=lambda base:ConnectionStore(base,self.vault)),
             patch.object(application.QPrinterInfo,'availablePrinters',return_value=[SimpleNamespace(printerName=lambda:'Test printer')]),
             patch.object(application,'PrintWorker',FakePrintWorker),
-            patch.object(application,'NativePrintJob',FakePrintWorker)]
+            patch.object(application,'NativePrintJob',FakePrintWorker),
+            patch.object(application,'WindowsSpooler',return_value=SimpleNamespace(available=False))]
         for p in self.patches: p.start()
         self.windows=[]; self.window=self.new_window()
     def new_window(self):
@@ -61,7 +62,7 @@ class AppTests(unittest.TestCase):
     def test_thumbnails_checkbox_batch_selection_and_manual_print(self):
         w=self.window
         for name,color in [('one.jpg','blue'),('two.jpg','red')]: self.assertTrue(w.enqueue(self.photo(name,color),False))
-        self.assertFalse(w.list.item(0).icon().isNull()); self.assertEqual(w.list.item(0).text(),'one.jpg')
+        self.assertFalse(w.list.item(0).icon().isNull()); self.assertEqual(w.list.item(0).text(),'two.jpg')
         w.check_all(True); self.assertEqual(len(w.selected_entries()),2)
         with patch.object(QMessageBox,'question',return_value=QMessageBox.StandardButton.Yes): w.manual()
         self.qt.processEvents(); self.assertTrue(w.print_worker.started); self.assertEqual(len(w.print_worker.paths),2)
@@ -249,4 +250,32 @@ class AppTests(unittest.TestCase):
         for _ in range(3): w.poll_spooler()
         self.assertIn(job['id'],w.spool_jobs); self.assertEqual(w.run_data[job['id']]['state'],'spool_error')
         self.assertIn('PermissionError',w.run_items[job['id']].text(3)); self.assertEqual(len(api.jobs),1)
+    def test_gallery_retains_only_100_newest_records(self):
+        w=self.window
+        for index in range(101): w.enqueue(self.photo(f'{index}.png',f'#{index:06x}'),False,added=float(index))
+        self.assertEqual(w.list.count(),100); self.assertEqual(w.list.item(0).text(),'100.png')
+        self.assertEqual(w.list.item(99).text(),'1.png')
+        self.assertEqual(w.db.execute('SELECT COUNT(*) FROM images').fetchone()[0],100)
+        self.assertEqual(len(w.pending),100); self.assertTrue((self.base/'0.png').is_file())
+    def test_older_restoration_cannot_push_live_photo_down(self):
+        w=self.window
+        w.enqueue(self.photo('old1.png','red'),False,added=1)
+        w.enqueue(self.photo('new.png','blue'),False,added=3)
+        w.enqueue(self.photo('old2.png','green'),False,added=2)
+        self.assertEqual([w.list.item(i).text() for i in range(3)],['new.png','old2.png','old1.png'])
+        w.close(); restored=self.new_window()
+        self.assertEqual([restored.list.item(i).text() for i in range(3)],['new.png','old2.png','old1.png'])
+    def test_clear_gallery_keeps_files_active_print_and_allows_manual_reimport(self):
+        w=self.window; path=self.photo('clear.png','red'); w.enqueue(path,False); w.check_all(True)
+        w.send_batch(w.selected_entries(),pdf_output=str(self.base/'clear.pdf')); self.qt.processEvents()
+        w.clear_gallery(); self.assertEqual(w.list.count(),0); self.assertTrue(path.exists())
+        self.assertIsNotNone(w.print_worker); self.assertEqual(w.db.execute('SELECT state FROM jobs').fetchone()[0],'sending')
+        w.enqueue(path,False); self.assertEqual(w.list.count(),0)
+        self.finish_print(w)
+        with patch.object(application.QFileDialog,'getOpenFileNames',return_value=([str(path)],'')): w.add_files()
+        self.assertEqual(w.list.count(),1)
+    def test_clear_stays_empty_after_restart(self):
+        w=self.window; path=self.photo('clear.png','blue'); w.enqueue(path,False); w.clear_gallery(); w.close()
+        restored=self.new_window(); self.assertEqual(restored.list.count(),0)
+        restored.enqueue(path,False); self.assertEqual(restored.list.count(),0); self.assertTrue(path.exists())
 if __name__=='__main__': unittest.main()

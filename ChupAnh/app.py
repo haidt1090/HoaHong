@@ -1,4 +1,4 @@
-import sys,json,hashlib,sqlite3,os,time,uuid
+import sys,json,hashlib,sqlite3,os,time,uuid,tempfile
 from datetime import datetime
 from collections import deque
 from pathlib import Path
@@ -9,21 +9,26 @@ from PySide6.QtGui import QImageReader,QIcon,QPixmap
 from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QFormLayout,QVBoxLayout,
     QHBoxLayout,QPushButton,QComboBox,QSpinBox,QLineEdit,QFileDialog,QListWidget,
     QListWidgetItem,QListView,QAbstractItemView,QCheckBox,QMessageBox,QLabel,
-    QTreeWidget,QTreeWidgetItem,QProgressBar,QGroupBox)
+    QTreeWidget,QTreeWidgetItem,QProgressBar,QGroupBox,QSplitter,QSizePolicy)
 from PySide6.QtPrintSupport import QPrinterInfo,QPrintPreviewDialog
 from layout import PAPERS,PHOTOS
 from printing import create_printer,render,PrintWorker,NativePrintJob,PDF_PRINTER,is_pdf_printer
 from spooler import WindowsSpooler,status_text
-BASE=Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'TelegramPhotoPrint'
+_smoke_data=tempfile.TemporaryDirectory(prefix='chupanh-smoke-') if '--smoke-test' in sys.argv else None
+BASE=Path(_smoke_data.name)/'TelegramPhotoPrint' if _smoke_data else Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'TelegramPhotoPrint'
 BASE.mkdir(parents=True,exist_ok=True)
 PATH_ROLE=int(Qt.ItemDataRole.UserRole)+1
+GALLERY_LIMIT=100
 
 class Window(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('Telegram Photo Print 1.3 — Windows'); self.resize(1040,820)
+        super().__init__(); self.setWindowTitle('Telegram Photo Print 1.4 — Windows'); self.resize(1040,820)
         self.db=sqlite3.connect(BASE/'history.sqlite')
         self.db.execute('CREATE TABLE IF NOT EXISTS jobs (digest TEXT PRIMARY KEY,state TEXT,file TEXT)')
         self.db.execute('CREATE TABLE IF NOT EXISTS images (digest TEXT PRIMARY KEY,path TEXT,added REAL)')
+        self.db.execute('CREATE TABLE IF NOT EXISTS hidden_images (digest TEXT PRIMARY KEY)')
+        self.db.execute('INSERT OR IGNORE INTO hidden_images SELECT digest FROM images ORDER BY added DESC LIMIT -1 OFFSET ?',(GALLERY_LIMIT,))
+        self.db.execute('DELETE FROM images WHERE digest IN (SELECT digest FROM hidden_images)')
         self.recovered=self.db.execute("UPDATE jobs SET state='review' WHERE state IN ('queued','sending')").rowcount
         self.db.execute('CREATE TABLE IF NOT EXISTS print_runs (id TEXT PRIMARY KEY,created REAL,label TEXT,state TEXT,done INTEGER,total INTEGER,current TEXT,printer TEXT,output TEXT,document TEXT,spool_id INTEGER)')
         self.db.execute('CREATE TABLE IF NOT EXISTS print_run_images (run_id TEXT,digest TEXT,PRIMARY KEY(run_id,digest))')
@@ -54,7 +59,7 @@ class Window(QMainWindow):
         self.list.setResizeMode(QListView.ResizeMode.Adjust); self.list.setMovement(QListView.Movement.Static)
         self.list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection); self.list.setWordWrap(True)
         self.list.setSpacing(5)
-        self.summary=QLabel('0 ảnh • đã chọn 0 ảnh')
+        self.summary=QLabel('0/100 ảnh • đã chọn 0 ảnh')
         self.status=QLabel('Sẵn sàng. Tích ô ảnh hoặc dùng Ctrl/Shift để chọn nhiều ảnh.'); self.status.setWordWrap(True)
         form=QFormLayout(); form.addRow('Thư mục ảnh bổ sung (tùy chọn)',self.folder); form.addRow('',self.recursive)
         form.addRow('Khổ giấy',self.paper); form.addRow('Máy in',self.printer)
@@ -68,26 +73,39 @@ class Window(QMainWindow):
             button=QPushButton(label); button.clicked.connect(fn); buttons.addWidget(button)
         root.addLayout(buttons); root.addWidget(self.auto)
         select_row=QHBoxLayout()
-        for label,fn in [('Chọn tất cả',lambda:self.check_all(True)),('Bỏ chọn',lambda:self.check_all(False))]:
+        for label,fn in [('Chọn tất cả',lambda:self.check_all(True)),('Bỏ chọn',lambda:self.check_all(False)),('Xóa ảnh đã chọn',self.remove_selected_photos),('Làm trống khung ảnh',self.clear_gallery)]:
             button=QPushButton(label); button.clicked.connect(fn); select_row.addWidget(button)
-        select_row.addWidget(self.summary,1); root.addLayout(select_row); root.addWidget(self.list,1)
+        select_row.addWidget(self.summary,1); root.addLayout(select_row)
+        photo_panel=QWidget(); photo_layout=QVBoxLayout(photo_panel); photo_layout.setContentsMargins(0,0,0,0)
+        photo_layout.addWidget(self.list,1); photo_panel.setMinimumHeight(110)
         actions=QHBoxLayout()
         for label,fn in [('Xem trước ảnh đã chọn',self.preview),('In ảnh đã chọn',self.manual),('Xuất PDF ảnh đã chọn',self.pdf)]:
-            button=QPushButton(label); button.clicked.connect(fn); actions.addWidget(button)
-        root.addLayout(actions)
+            button=QPushButton(label)
+            if fn==self.manual:
+                font=button.font(); font.setPointSize(font.pointSize()+2); font.setBold(True); button.setFont(font); button.setMinimumHeight(38)
+            button.clicked.connect(fn); actions.addWidget(button)
+        photo_layout.addLayout(actions)
         progress_group=QGroupBox('Tiến độ và hàng đợi in'); progress_layout=QVBoxLayout(progress_group)
         self.progress_label=QLabel('Chưa có tác vụ in'); self.progress_label.setWordWrap(True)
         self.progress_bar=QProgressBar(); self.progress_bar.setRange(0,1); self.progress_bar.setValue(0)
         progress_layout.addWidget(self.progress_label); progress_layout.addWidget(self.progress_bar)
         self.queue_table=QTreeWidget(); self.queue_table.setHeaderLabels(['Lượt in','Ảnh đang xử lý','Đã xử lý','Trạng thái','Máy in / PDF'])
         self.queue_table.currentItemChanged.connect(lambda *_:self.show_selected_progress())
-        self.queue_table.setRootIsDecorated(False); self.queue_table.setAlternatingRowColors(True); self.queue_table.setMaximumHeight(140)
+        self.queue_table.setRootIsDecorated(False); self.queue_table.setAlternatingRowColors(True); self.queue_table.setMinimumHeight(65); self.queue_table.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Ignored)
         for index,width in enumerate([155,170,85,260,240]): self.queue_table.setColumnWidth(index,width)
         progress_layout.addWidget(self.queue_table)
         controls=QHBoxLayout()
         for label,fn in [('Tạm dừng',self.pause_printing),('Tiếp tục',self.resume_printing),('Hủy lệnh đã chọn',self.cancel_selected_print),('Mở hàng đợi Windows',self.open_windows_queue),('Xóa tiến độ đã xong',self.clear_progress)]:
             button=QPushButton(label); button.clicked.connect(fn); controls.addWidget(button)
-        progress_layout.addLayout(controls); root.addWidget(progress_group)
+        progress_layout.addLayout(controls); progress_group.setMinimumHeight(185)
+        self.splitter=QSplitter(Qt.Orientation.Vertical); self.splitter.setChildrenCollapsible(False); self.splitter.setHandleWidth(8)
+        self.splitter.addWidget(photo_panel); self.splitter.addWidget(progress_group)
+        self.splitter.setStretchFactor(0,4); self.splitter.setStretchFactor(1,1)
+        self.splitter.handle(1).setToolTip('Kéo lên/xuống để đổi kích thước khung ảnh và tiến độ')
+        self.splitter.setStyleSheet('QSplitter::handle:vertical { background: #c9cdd2; margin: 1px 0; } QSplitter::handle:vertical:hover { background: #8796a5; }')
+        panel_sizes=self.saved.get('panel_sizes',[600,175])
+        if not isinstance(panel_sizes,list) or len(panel_sizes)!=2 or any(not isinstance(v,int) or v<=0 for v in panel_sizes): panel_sizes=[600,175]
+        self.splitter.setSizes(panel_sizes); root.addWidget(self.splitter,1)
         if self.recovered:
             notice=QLabel(f'{self.recovered} ảnh có tác vụ cũ chưa rõ kết quả. Đã bỏ trạng thái chờ bị kẹt; kiểm tra hàng đợi Windows trước khi in lại bằng tay.')
             notice.setWordWrap(True); root.addWidget(notice)
@@ -96,7 +114,7 @@ class Window(QMainWindow):
         self.recursive.toggled.connect(self.source_changed); self.auto.toggled.connect(self.arm)
         self.list.itemSelectionChanged.connect(self.update_summary); self.list.itemChanged.connect(self.update_summary)
         self.timer=QTimer(self); self.timer.timeout.connect(self.scan); self.timer.start(2000)
-        self.restore_paths=deque(path for path, in self.db.execute('SELECT path FROM images ORDER BY added'))
+        self.restore_paths=deque(self.db.execute('SELECT path,added FROM images ORDER BY added'))
         from telegram_ui import TelegramDialog
         self.telegram_dialog=TelegramDialog(self,BASE)
         self.load_run_history()
@@ -110,8 +128,8 @@ class Window(QMainWindow):
     def load_library_chunk(self):
         if self.closing: return
         for _ in range(min(10,len(self.restore_paths))):
-            path=Path(self.restore_paths.popleft())
-            if path.is_file(): self.enqueue(path,False)
+            stored_path,added=self.restore_paths.popleft(); path=Path(stored_path)
+            if path.is_file(): self.enqueue(path,False,added=added)
         if self.restore_paths: QTimer.singleShot(0,self.load_library_chunk)
     def snapshot(self):
         return {'paper':self.paper.currentText(),'photo':self.photo.currentText(),
@@ -121,7 +139,7 @@ class Window(QMainWindow):
         temporary.write_text(json.dumps(self.saved,ensure_ascii=False,indent=2),encoding='utf-8'); temporary.replace(self.settings)
     def save_settings(self):
         try:
-            self.saved.update(self.snapshot()); self.saved.update(folder=self.folder.text(),recursive=self.recursive.isChecked(),auto_print=self.auto.isChecked(),pdf_folder=self.pdf_folder.text())
+            self.saved.update(self.snapshot()); self.saved.update(folder=self.folder.text(),recursive=self.recursive.isChecked(),auto_print=self.auto.isChecked(),pdf_folder=self.pdf_folder.text(),panel_sizes=self.splitter.sizes())
             self.write_settings(); self.status.setText('Đã lưu máy in, khổ giấy, kích thước, số bản, thư mục và trạng thái tự động in.')
         except OSError as exc: self.error(exc)
     def refresh_printers(self):
@@ -165,7 +183,7 @@ class Window(QMainWindow):
         self.db.close(); event.accept()
     def add_files(self):
         paths,_=QFileDialog.getOpenFileNames(self,'Chọn ảnh','','Ảnh (*.jpg *.jpeg *.png *.webp *.bmp)')
-        for path in paths: self.enqueue(Path(path),self.auto.isChecked())
+        for path in paths: self.enqueue(Path(path),self.auto.isChecked(),allow_hidden=True)
     def arm(self,on):
         if on:
             if not self.printer.currentText():
@@ -182,13 +200,13 @@ class Window(QMainWindow):
         checked=[self.list.item(i) for i in range(self.list.count()) if self.list.item(i).checkState()==Qt.CheckState.Checked]
         return checked or self.list.selectedItems()
     def update_summary(self,*args):
-        self.summary.setText(f'{self.list.count()} ảnh • đã chọn {len(self.selection_items())} ảnh')
+        self.summary.setText(f'{self.list.count()}/{GALLERY_LIMIT} ảnh • đã chọn {len(self.selection_items())} ảnh')
     def selected_entries(self):
         selected=self.selection_items()
         if not selected: raise ValueError('Tích ô các ảnh hoặc chọn ảnh bằng Ctrl/Shift trước khi in.')
         return [(Path(item.data(PATH_ROLE)),item.data(Qt.ItemDataRole.UserRole)) for item in selected]
     def selected(self): return self.selected_entries()[0]
-    def enqueue(self,path,automatic):
+    def enqueue(self,path,automatic,added=None,allow_hidden=False):
         if self.closing: return False
         try:
             path=Path(path); reader=QImageReader(str(path)); reader.setAutoTransform(True)
@@ -200,19 +218,44 @@ class Window(QMainWindow):
             with path.open('rb') as source:
                 for chunk in iter(lambda:source.read(1024*1024),b''): hasher.update(chunk)
             digest=hasher.hexdigest()
+            if self.db.execute('SELECT 1 FROM hidden_images WHERE digest=?',(digest,)).fetchone():
+                if not allow_hidden: return True
+                self.db.execute('DELETE FROM hidden_images WHERE digest=?',(digest,))
             if digest in self.pending: return True
             self.pending[digest]=str(path)
             item=QListWidgetItem(QIcon(QPixmap.fromImage(thumbnail)),path.name)
             item.setData(Qt.ItemDataRole.UserRole,digest); item.setData(PATH_ROLE,str(path)); item.setToolTip(str(path))
             item.setFlags(item.flags()|Qt.ItemFlag.ItemIsUserCheckable); item.setCheckState(Qt.CheckState.Unchecked)
-            self.list.addItem(item); self.items[digest]=item
-            self.db.execute('INSERT OR REPLACE INTO images VALUES (?,?,?)',(digest,str(path),time.time())); self.db.commit()
-            self.update_summary()
+            added=time.time() if added is None else float(added)
+            item.setData(PATH_ROLE+1,added)
+            position=0
+            while position<self.list.count() and self.list.item(position).data(PATH_ROLE+1)>added: position+=1
+            self.list.insertItem(position,item); self.items[digest]=item
+            self.db.execute('INSERT OR REPLACE INTO images VALUES (?,?,?)',(digest,str(path),added))
+            while self.list.count()>GALLERY_LIMIT: self.forget_gallery_item(self.list.item(self.list.count()-1))
+            self.db.commit(); self.update_summary()
             state=self.db.execute('SELECT state FROM jobs WHERE digest=?',(digest,)).fetchone()
             if automatic and (not state or state[0]=='cancelled'): self.send(path,digest)
             return True
         except Exception as exc:
             self.auto.setChecked(False); self.status.setText('Không nhận/in được ảnh: '+str(exc)); return False
+    def forget_gallery_item(self,item):
+        digest=item.data(Qt.ItemDataRole.UserRole)
+        self.db.execute('INSERT OR IGNORE INTO hidden_images VALUES (?)',(digest,))
+        self.db.execute('DELETE FROM images WHERE digest=?',(digest,))
+        self.pending.pop(digest,None); self.items.pop(digest,None)
+        self.list.takeItem(self.list.row(item))
+    def remove_selected_photos(self):
+        items=list(self.selection_items())
+        if not items: self.status.setText('Chọn ảnh cần bỏ khỏi khung trước.'); return
+        for item in items: self.forget_gallery_item(item)
+        self.db.commit(); self.update_summary()
+        self.status.setText(f'Đã bỏ {len(items)} ảnh khỏi khung. Giữ nguyên file ảnh và lệnh in đang chờ.')
+    def clear_gallery(self):
+        count=self.list.count(); self.restore_paths.clear()
+        for index in range(self.list.count()-1,-1,-1): self.forget_gallery_item(self.list.item(index))
+        self.db.commit(); self.update_summary()
+        self.status.setText(f'Đã làm trống {count} ảnh trên khung. File ảnh và tiến độ in vẫn được giữ.')
     def scan(self):
         if self.closing: return
         if self.future is not None:
@@ -345,7 +388,7 @@ class Window(QMainWindow):
     def create_run_item(self,data):
         item=QTreeWidgetItem([data['label'],Path(data['current']).name if data['current'] else '',f"{data['done']}/{data['total']}",data['state'],data['output'] or data['printer']])
         item.setData(0,Qt.ItemDataRole.UserRole,data['id']); item.setToolTip(4,data['output'] or data['printer'])
-        self.queue_table.addTopLevelItem(item); self.run_items[data['id']]=item
+        self.queue_table.insertTopLevelItem(0,item); self.run_items[data['id']]=item
         if not self.queue_table.currentItem(): self.queue_table.setCurrentItem(item)
     def persist_run(self,data):
         self.db.execute('INSERT OR REPLACE INTO print_runs VALUES (?,?,?,?,?,?,?,?,?,?,?)',tuple(data[key] for key in ('id','created','label','state','done','total','current','printer','output','document','spool_id')))
@@ -395,6 +438,7 @@ class Window(QMainWindow):
             else:
                 texts={'exported':'PDF hoàn tất','completed':'Không còn trong hàng đợi Windows','cancelled':'Đã hủy','error':'Lỗi ở lần chạy trước','interrupted':'Bị gián đoạn','submitted':'Đã gửi máy in'}
                 self.run_items[data['id']].setText(3,texts.get(data['state'],data['state']))
+        if self.queue_table.topLevelItemCount(): self.queue_table.setCurrentItem(self.queue_table.topLevelItem(0))
     def pause_printing(self):
         self.queue_paused=True
         if self.print_worker: self.print_worker.pause()
@@ -500,6 +544,16 @@ class Window(QMainWindow):
         self.telegram_dialog.show(); self.telegram_dialog.raise_(); self.telegram_dialog.activateWindow()
 if __name__=='__main__':
     app=QApplication(sys.argv)
+    if '--smoke-test' in sys.argv:
+        from smoke import run_smoke_test
+        import traceback
+        try: report=run_smoke_test(Window,BASE); result=0
+        except Exception: report={'ok':False,'error':traceback.format_exc()}; result=1
+        if '--smoke-report' in sys.argv:
+            destination=Path(sys.argv[sys.argv.index('--smoke-report')+1]); destination.parent.mkdir(parents=True,exist_ok=True)
+            destination.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+        elif sys.stdout: print(json.dumps(report,ensure_ascii=False))
+        sys.exit(result)
     instance_lock=QLockFile(str(BASE/'application.lock'))
     if not instance_lock.tryLock(0):
         QMessageBox.information(None,'Ứng dụng đang chạy','Telegram Photo Print đã mở. Chuyển sang cửa sổ đang chạy để tiếp tục.'); sys.exit(0)
