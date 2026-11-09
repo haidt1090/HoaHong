@@ -1,9 +1,20 @@
-"""Telegram adapters. Credentials stay in memory; sessions stay on this PC."""
+"""Telegram adapters with durable bot offsets and explicit connection status."""
 import asyncio, json, queue, sqlite3, re
 from pathlib import Path
 from PySide6.QtCore import QThread, Signal
 
-SUPPORTED={'image/jpeg':'.jpg','image/png':'.png','image/webp':'.webp','image/bmp':'.bmp'}
+class BotAPIError(Exception):
+    def __init__(self,code): self.code=code
+
+def bot_error_text(exc):
+    if isinstance(exc,BotAPIError):
+        if exc.code==401: return 'Token bot không hợp lệ hoặc đã bị thu hồi. Kiểm tra token ở @BotFather.'
+        if exc.code==409: return 'Bot đang có webhook hoặc một ứng dụng khác đang nhận cập nhật. Chỉ chạy một bản phần mềm cho bot này.'
+        if exc.code==403: return 'Bot không có quyền truy cập. Kiểm tra bot còn trong nhóm và quyền nhận ảnh.'
+        if exc.code==429: return 'Telegram đang giới hạn yêu cầu; đang chờ để thử lại.'
+    return 'Lỗi mạng/nhận ảnh ('+type(exc).__name__+'). Đang tự thử lại.'
+
+SUPPORTED={'image/jpeg' :'.jpg','image/png':'.png','image/webp':'.webp','image/bmp':'.bmp'}
 def bot_media(message):
     if message.get('photo'):
         item=max(message['photo'],key=lambda p:p.get('file_size',p.get('width',0)*p.get('height',0)))
@@ -57,11 +68,32 @@ class TelegramWorker(QThread):
             async def api(method,**data):
                 r=await client.post('https://api.telegram.org/bot'+token+'/'+method,json=data)
                 payload=r.json()
-                if not payload.get('ok'): raise RuntimeError('Telegram API rejected request')
+                if not payload.get('ok'): raise BotAPIError(payload.get('error_code',r.status_code))
                 return payload['result']
-            me=await api('getMe'); self.identity=str(me['id'])
-            self.stage.emit('ready'); self.status.emit('Bot đã kết nối. Gửi tin nhắn trong nhóm để nhóm xuất hiện trong danh sách.')
-            offset=0
+            self.db.execute('CREATE TABLE IF NOT EXISTS bot_offsets (bot TEXT PRIMARY KEY, offset INTEGER)')
+            while not self.stopping:
+                self.drain()
+                if self.stopping: return
+                try:
+                    me=await api('getMe'); self.identity=str(me['id'])
+                    webhook=await api('getWebhookInfo')
+                    if webhook.get('url'):
+                        self.status.emit('Bot đang dùng webhook. Tắt webhook ở dịch vụ đang dùng hoặc tạo bot riêng; phần mềm không tự xóa webhook.')
+                        self.stage.emit('error'); return
+                    break
+                except Exception as exc:
+                    self.status.emit(bot_error_text(exc))
+                    if isinstance(exc,BotAPIError) and exc.code in (401,403): self.stage.emit('error'); return
+                    await asyncio.sleep(3)
+            if self.stopping: return
+            self.stage.emit('ready')
+            if self.known: self.groups.emit(list(self.known.items()))
+            if self.selected is not None: self.status.emit('Đã khôi phục: đang nhận ảnh từ nhóm ID '+str(self.selected))
+            else: self.status.emit('Bot đã kết nối. Gửi tin nhắn trong nhóm, chọn nhóm rồi bấm Nhận ảnh từ nhóm.')
+            if not me.get('can_read_all_group_messages',False):
+                self.status.emit('Bot còn bật Group Privacy: để nhận ảnh thông thường, tắt privacy ở @BotFather rồi thêm lại bot, hoặc cấp quyền quản trị trong nhóm.')
+            row=self.db.execute('SELECT offset FROM bot_offsets WHERE bot=?',(self.identity,)).fetchone()
+            offset=row[0] if row else 0
             while not self.stopping:
                 self.drain()
                 if self.stopping: break
@@ -69,6 +101,7 @@ class TelegramWorker(QThread):
                     updates=await api('getUpdates',offset=offset,timeout=5,allowed_updates=['message','my_chat_member'])
                     for update in updates:
                         self.drain()
+                        if self.stopping: break
                         message=update.get('message',{}); chat=message.get('chat') or update.get('my_chat_member',{}).get('chat',{})
                         chat_id=chat.get('id')
                         if chat.get('type') in ('group','supergroup'): self.remember(chat_id,chat.get('title',str(chat_id)))
@@ -94,8 +127,10 @@ class TelegramWorker(QThread):
                                         self.publish(temporary,dest,key,chat_id)
                                     finally: temporary.unlink(missing_ok=True)
                         offset=update['update_id']+1
+                        self.db.execute('INSERT OR REPLACE INTO bot_offsets VALUES (?,?)',(self.identity,offset)); self.db.commit()
                 except Exception as exc:
-                    self.status.emit('Lỗi nhận bot ('+type(exc).__name__+'). Thử lại sau 3 giây; chỉ chạy một nơi nhận bot, không dùng webhook đồng thời.')
+                    self.status.emit(bot_error_text(exc))
+                    if isinstance(exc,BotAPIError) and exc.code==401: self.stage.emit('error'); return
                     await asyncio.sleep(3)
     async def account(self):
         from telethon import TelegramClient,events,errors,utils
@@ -126,7 +161,7 @@ class TelegramWorker(QThread):
             async for dialog in client.iter_dialogs():
                 if dialog.is_group: self.known[utils.get_peer_id(dialog.entity)]=dialog.name
             self.groups.emit(list(self.known.items())); self.stage.emit('ready')
-            self.status.emit('Đã đăng nhập. Chọn nhóm rồi bấm Nhận ảnh từ nhóm.')
+            self.status.emit('Đang nhận ảnh từ nhóm ID '+str(self.selected) if self.selected is not None else 'Đã đăng nhập. Chọn nhóm rồi bấm Nhận ảnh từ nhóm.')
         try:
             authorized=await client.is_user_authorized()
             if authorized: await ready()

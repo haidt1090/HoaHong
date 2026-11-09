@@ -1,4 +1,4 @@
-import asyncio,sqlite3,tempfile,unittest
+import asyncio,sqlite3,tempfile,unittest,json
 from pathlib import Path
 from unittest.mock import patch
 import httpx
@@ -15,14 +15,15 @@ class MediaTests(unittest.TestCase):
             worker=TelegramWorker('bot',{'token':'123:fake_token'},d)
             worker.db=sqlite3.connect(':memory:'); worker.db.execute('CREATE TABLE received (key TEXT PRIMARY KEY)')
             worker.selected=-1001
-            counters={'polls':0,'downloads':0}
+            counters={'polls':0,'downloads':0}; offsets=[]
             def message(chat_id,message_id):
                 return {'message_id':message_id,'chat':{'id':chat_id,'type':'supergroup','title':'Test'},'photo':[{'file_id':'pic','file_size':3}]}
             def handler(request):
                 path=request.url.path
                 if path.endswith('getMe'): return httpx.Response(200,json={'ok':True,'result':{'id':123}})
+                if path.endswith('getWebhookInfo'): return httpx.Response(200,json={'ok':True,'result':{'url':''}})
                 if path.endswith('getUpdates'):
-                    counters['polls']+=1
+                    counters['polls']+=1; offsets.append(json.loads(request.content)['offset'])
                     if counters['polls']==1:
                         updates=[{'update_id':1,'message':message(-1001,10)}, {'update_id':2,'message':message(-1002,11)}, {'update_id':3,'message':message(-1001,10)}]
                     else: worker.stopping=True; updates=[]
@@ -36,6 +37,8 @@ class MediaTests(unittest.TestCase):
             files=list(Path(d).rglob('*.jpg'))
             self.assertEqual(len(files),1); self.assertEqual(files[0].read_bytes(),b'img')
             self.assertEqual(counters['downloads'],1)
+            self.assertEqual(offsets,[0,4])
+            self.assertEqual(worker.db.execute('SELECT offset FROM bot_offsets WHERE bot=?',('123',)).fetchone()[0],4)
             self.assertEqual(list(Path(d).rglob('*.part')),[])
             worker.db.close()
 
