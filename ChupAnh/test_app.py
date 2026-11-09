@@ -106,4 +106,24 @@ class AppTests(unittest.TestCase):
         self.finish_print(w,error='Printer unavailable')
         self.assertFalse(w.auto.isChecked()); self.assertIn('Printer unavailable',w.status.text())
         self.assertEqual(w.db.execute('SELECT state FROM jobs').fetchone()[0],'review')
+    def test_stale_queue_is_recovered_and_manual_reprint_is_allowed(self):
+        w=self.window; path=self.photo('old.png','orange'); w.enqueue(path,False)
+        digest=next(iter(w.pending)); w.db.execute('INSERT INTO jobs VALUES (?,?,?)',(digest,'sending',str(path))); w.db.commit(); w.close()
+        restored=self.new_window(); self.assertEqual(restored.recovered,1)
+        self.assertEqual(restored.db.execute('SELECT state FROM jobs').fetchone()[0],'review')
+        restored.send_batch([(path,digest)]); self.qt.processEvents()
+        self.assertIsNotNone(restored.print_worker); self.finish_print(restored)
+    def test_busy_photo_is_skipped_but_other_photos_can_print(self):
+        w=self.window; one=self.photo('one.png','red'); two=self.photo('two.png','blue')
+        w.enqueue(one,False); w.enqueue(two,False); entries=[(Path(path),digest) for digest,path in w.pending.items()]
+        w.send_batch(entries[:1]); self.qt.processEvents()
+        w.send_batch(entries)
+        self.assertEqual(len(w.print_queue),1); self.assertEqual(len(w.print_queue[0]['entries']),1)
+        self.assertEqual(w.print_queue[0]['entries'][0][0],two)
+        self.finish_print(w); self.finish_print(w)
+    def test_clicking_same_busy_photo_again_does_not_throw(self):
+        w=self.window; path=self.photo('one.png','red'); w.enqueue(path,False)
+        entry=(path,next(iter(w.pending))); w.send_batch([entry]); self.qt.processEvents()
+        w.send_batch([entry]); self.assertEqual(len(w.print_queue),0)
+        self.assertIn('không xếp thêm bản trùng',w.status.text()); self.finish_print(w)
 if __name__=='__main__': unittest.main()

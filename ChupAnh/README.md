@@ -1,3 +1,17 @@
+# Sửa lỗi 1.2.1: ảnh bị kẹt trong hàng đợi
+
+- Khởi động sẽ chuyển trạng thái chờ/gửi còn sót từ lần chạy trước sang cần kiểm tra,
+  không khóa ảnh vĩnh viễn và không tự in lại tác vụ chưa rõ kết quả.
+- In tay cho phép in lại sau khi kiểm tra hàng đợi Windows và xác nhận.
+- Nếu một số ảnh trong lô đang thực sự được xử lý, bỏ qua chúng và tiếp tục xếp các ảnh khác.
+- Bấm in lại ảnh đang xử lý không còn hiện hộp thoại lỗi chặn thao tác.
+- Chỉ cho mở một phiên ứng dụng để tránh hai bản tranh nhận bot và ghi trạng thái in.
+
+Thoát bản cũ, giải nén bản mới, chạy MO_UNG_DUNG.bat. Không cần xóa lịch sử hoặc token.
+Nếu trước đó đã có lệnh gửi máy in, kiểm tra hàng đợi Windows trước khi in lại bằng tay.
+
+---
+
 # ChupAnh — Telegram Photo Print 1.2 cho Windows
 
 Nhận ảnh bằng Bot hoặc tài khoản Telegram qua API, không auto click.

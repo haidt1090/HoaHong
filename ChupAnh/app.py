@@ -3,7 +3,7 @@ from collections import deque
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from folder_source import inventory,FolderTracker
-from PySide6.QtCore import Qt,QTimer,QSize
+from PySide6.QtCore import Qt,QTimer,QSize,QLockFile
 from PySide6.QtGui import QImageReader,QIcon,QPixmap
 from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QFormLayout,QVBoxLayout,
     QHBoxLayout,QPushButton,QComboBox,QSpinBox,QLineEdit,QFileDialog,QListWidget,
@@ -17,12 +17,14 @@ PATH_ROLE=int(Qt.ItemDataRole.UserRole)+1
 
 class Window(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('Telegram Photo Print 1.2 — Windows'); self.resize(1040,820)
+        super().__init__(); self.setWindowTitle('Telegram Photo Print 1.2.1 — Windows'); self.resize(1040,820)
         self.db=sqlite3.connect(BASE/'history.sqlite')
         self.db.execute('CREATE TABLE IF NOT EXISTS jobs (digest TEXT PRIMARY KEY,state TEXT,file TEXT)')
-        self.db.execute('CREATE TABLE IF NOT EXISTS images (digest TEXT PRIMARY KEY,path TEXT,added REAL)'); self.db.commit()
+        self.db.execute('CREATE TABLE IF NOT EXISTS images (digest TEXT PRIMARY KEY,path TEXT,added REAL)')
+        self.recovered=self.db.execute("UPDATE jobs SET state='review' WHERE state IN ('queued','sending')").rowcount
+        self.db.commit()
         self.pending={}; self.items={}; self.stable={}; self.closing=False; self.closed=False
-        self.print_queue=deque(); self.print_worker=None
+        self.print_queue=deque(); self.print_worker=None; self.current_print_job=None
         self.pool=ThreadPoolExecutor(max_workers=1); self.future=None; self.generation=0
         self.tracker=FolderTracker(); self.processed={}; self.settings=BASE/'settings.json'
         try: self.saved=json.loads(self.settings.read_text(encoding='utf-8'))
@@ -60,7 +62,11 @@ class Window(QMainWindow):
         actions=QHBoxLayout()
         for label,fn in [('Xem trước ảnh đã chọn',self.preview),('In ảnh đã chọn',self.manual),('Xuất PDF ảnh đã chọn',self.pdf)]:
             button=QPushButton(label); button.clicked.connect(fn); actions.addWidget(button)
-        root.addLayout(actions); root.addWidget(self.status)
+        root.addLayout(actions)
+        if self.recovered:
+            notice=QLabel(f'{self.recovered} ảnh có tác vụ cũ chưa rõ kết quả. Đã bỏ trạng thái chờ bị kẹt; kiểm tra hàng đợi Windows trước khi in lại bằng tay.')
+            notice.setWordWrap(True); root.addWidget(notice)
+        root.addWidget(self.status)
         widget=QWidget(); widget.setLayout(root); self.setCentralWidget(widget)
         self.recursive.toggled.connect(self.source_changed); self.auto.toggled.connect(self.arm)
         self.list.itemSelectionChanged.connect(self.update_summary); self.list.itemChanged.connect(self.update_summary)
@@ -201,17 +207,24 @@ class Window(QMainWindow):
                 self.status.setText(f'Đã xuất PDF cho {len(paths)} ảnh: {dest}')
         except Exception as exc: self.error(exc)
     def send(self,path,digest): self.send_batch([(Path(path),digest)],automatic=True)
+    def active_digests(self):
+        jobs=list(self.print_queue)
+        if self.current_print_job: jobs.append(self.current_print_job)
+        return {digest for job in jobs for _,digest in job['entries']}
     def send_batch(self,entries,automatic=False):
         if self.closing: return
         settings=self.snapshot()
         if not settings['printer']: raise ValueError('Hãy chọn máy in trước khi in.')
-        for _,digest in entries:
-            row=self.db.execute('SELECT state FROM jobs WHERE digest=?',(digest,)).fetchone()
-            if row and row[0] in ('queued','sending'): raise ValueError('Một ảnh đã nằm trong hàng đợi. Chờ tác vụ trước kết thúc.')
+        active=self.active_digests(); original_count=len(entries)
+        entries=[(path,digest) for path,digest in entries if digest not in active]
+        skipped=original_count-len(entries)
+        if not entries:
+            self.status.setText('Các ảnh này đang được xử lý; không xếp thêm bản trùng. Bạn có thể tiếp tục chọn ảnh khác.')
+            return
         for path,digest in entries:
             self.db.execute('INSERT OR REPLACE INTO jobs VALUES (?,?,?)',(digest,'queued',str(path)))
         self.db.commit(); self.print_queue.append({'entries':list(entries),'settings':settings,'automatic':automatic})
-        self.status.setText(f'Đã xếp hàng {len(entries)} ảnh, {settings["count"]} bản mỗi ảnh.')
+        self.status.setText(f'Đã xếp hàng {len(entries)} ảnh, {settings["count"]} bản mỗi ảnh.'+(f' Bỏ qua {skipped} ảnh đang được xử lý.' if skipped else ''))
         QTimer.singleShot(0,self.start_next_print)
     def cancel_queued_prints(self,automatic_only=False):
         keep=deque()
@@ -221,7 +234,7 @@ class Window(QMainWindow):
         self.print_queue=keep; self.db.commit()
     def start_next_print(self):
         if self.closing or self.print_worker or not self.print_queue: return
-        job=self.print_queue.popleft()
+        job=self.print_queue.popleft(); self.current_print_job=job
         for _,digest in job['entries']: self.db.execute('UPDATE jobs SET state=? WHERE digest=?',('sending',digest))
         self.db.commit()
         worker=PrintWorker([path for path,_ in job['entries']],job['settings'],self); self.print_worker=worker
@@ -230,7 +243,7 @@ class Window(QMainWindow):
     def print_finished(self,worker,job):
         state='review' if worker.error else 'submitted'
         for _,digest in job['entries']: self.db.execute('UPDATE jobs SET state=? WHERE digest=?',(state,digest))
-        self.db.commit(); self.print_worker=None; worker.deleteLater()
+        self.db.commit(); self.print_worker=None; self.current_print_job=None; worker.deleteLater()
         if worker.error:
             self.auto.setChecked(False); self.cancel_queued_prints()
             self.status.setText('In gặp lỗi: '+worker.error+' Kiểm tra hàng đợi máy in trước khi in lại.')
@@ -240,10 +253,16 @@ class Window(QMainWindow):
     def manual(self):
         try:
             entries=self.selected_entries(); total=len(entries)*self.count.value()
-            if QMessageBox.question(self,'Xác nhận in',f'In {len(entries)} ảnh khác nhau × {self.count.value()} bản = {total} ảnh, giấy {self.paper.currentText()}?')==QMessageBox.StandardButton.Yes:
+            review=sum(1 for _,digest in entries if self.db.execute('SELECT state FROM jobs WHERE digest=?',(digest,)).fetchone()==('review',))
+            warning=f'\n{review} ảnh có tác vụ trước chưa rõ kết quả; hãy kiểm tra hàng đợi Windows trước khi in lại.' if review else ''
+            if QMessageBox.question(self,'Xác nhận in',f'In {len(entries)} ảnh khác nhau × {self.count.value()} bản = {total} ảnh, giấy {self.paper.currentText()}?'+warning)==QMessageBox.StandardButton.Yes:
                 self.send_batch(entries)
         except Exception as exc: self.error(exc)
     def collect(self):
         self.telegram_dialog.show(); self.telegram_dialog.raise_(); self.telegram_dialog.activateWindow()
 if __name__=='__main__':
-    app=QApplication(sys.argv); window=Window(); window.show(); sys.exit(app.exec())
+    app=QApplication(sys.argv)
+    instance_lock=QLockFile(str(BASE/'application.lock'))
+    if not instance_lock.tryLock(0):
+        QMessageBox.information(None,'Ứng dụng đang chạy','Telegram Photo Print đã mở. Chuyển sang cửa sổ đang chạy để tiếp tục.'); sys.exit(0)
+    window=Window(); window.show(); sys.exit(app.exec())
