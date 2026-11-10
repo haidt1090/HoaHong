@@ -10,7 +10,8 @@ def compiler_command(root):
         '--output-dir='+str(root/'build'/'nuitka'),
         '--include-package=telethon','--include-package=keyring.backends',
         '--include-module=keyring.backends.Windows','--include-module=win32print',
-        '--include-module=win32timezone','--include-package-data=certifi',
+        '--include-module=win32timezone','--include-module=private_defaults',
+        '--include-data-files='+str(root/'YEU_CAU.md')+'=YEU_CAU.md','--include-package-data=certifi',
         '--include-distribution-metadata=keyring',
         '--python-flag=no_docstrings','--python-flag=no_asserts','--lto=yes',
         '--assume-yes-for-downloads',str(root/'app.py')]

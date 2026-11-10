@@ -49,6 +49,9 @@ class Owner(QWidget):
     def enqueue(self,path,auto,**kwargs): self.received.append((path,auto)); self.list.addItem(str(path)); return True
 
 class DialogTests(unittest.TestCase):
+    def setUp(self):
+        self.no_seed=patch('telegram_ui.default_connection',return_value=None); self.no_seed.start()
+    def tearDown(self): self.no_seed.stop()
     @classmethod
     def setUpClass(cls): cls.app=QApplication.instance() or QApplication([])
     def test_close_keeps_receiving_save_and_startup_select_before_polling(self):

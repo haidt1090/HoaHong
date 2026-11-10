@@ -25,7 +25,7 @@ class ConnectionStore:
         except (OSError,ValueError,KeyError,TypeError): return None
     def save(self,mode,credentials,group_id,group_title,auto_connect=True):
         if mode=='bot':
-            secret={'token':credentials['token'].strip()}
+            secret={'token':credentials['token'].strip(),'expected_username':credentials.get('expected_username','pkhoahongbot').strip().lstrip('@')}
             identity=secret['token'].split(':')[0]
         else:
             secret={'api_id':credentials['api_id'].strip(),'api_hash':credentials['api_hash'].strip()}

@@ -1,4 +1,4 @@
-# CHUPANH 1.5.1 — môi trường được ghi lại để cài đặt và đóng gói sau này.
+# CHUPANH 1.6 PRIVATE — môi trường được ghi lại để cài đặt và đóng gói sau này.
 # Hệ điều hành sử dụng đầy đủ: Windows 10/11 x64; bắt buộc CPython 3.12 x64 cho CAI_DAT và DONG_GOI.
 # Chạy source: .venv; đóng gói thủ công: .build-venv (DONG_GOI.bat dùng Python 3.12).
 # Giao diện, in/PDF, Telegram, HTTP và Windows Credential Manager:
@@ -20,3 +20,6 @@ zstandard==0.25.0; sys_platform == "win32"
 
 # setup_environment.py bat buoc Python 3.12 x64 va --only-binary=zstandard,pywin32.
 # zstandard 0.25.0 co wheel cp312-cp312-win_amd64, khong can MSVC de cai goi nay.
+
+# Xem truoc/chinh khoang cach/chong anh: QGraphicsView/QGraphicsScene va QDoubleSpinBox
+# deu nam trong PySide6; khong can them thu vien anh ngoai. Mau/ghi chu dung json/pathlib.

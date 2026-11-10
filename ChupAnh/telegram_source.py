@@ -77,8 +77,8 @@ class TelegramWorker(QThread):
                 if self.stopping: return
                 try:
                     me=await api('getMe')
-                    if not allowed_bot(me):
-                        self.status.emit('Từ chối kết nối: phần mềm chỉ cho phép bot @pkhoahongbot.'); self.stage.emit('error'); return
+                    if not allowed_bot(me,self.credentials.get('expected_username','pkhoahongbot')):
+                        self.status.emit('Token không thuộc username bot đang chọn. Kiểm tra lại phần Sửa kết nối.'); self.stage.emit('error'); return
                     self.access_verified=True; self.identity=str(me['id'])
                     webhook=await api('getWebhookInfo')
                     if webhook.get('url'):

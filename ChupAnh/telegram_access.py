@@ -13,8 +13,9 @@ def normalize_phone(value):
 def phone_fingerprint(value):
     return hashlib.scrypt(normalize_phone(value).encode('ascii'),salt=ACCOUNT_SALT,n=32768,r=8,p=1,maxmem=64*1024*1024,dklen=32).hex()
 
-def allowed_bot(user):
-    return str(user.get('username') or '').lstrip('@').casefold()==ALLOWED_BOT_USERNAME
+def allowed_bot(user,expected_username=ALLOWED_BOT_USERNAME):
+    expected=str(expected_username).strip().lstrip('@').casefold()
+    return bool(expected) and str(user.get('username') or '').lstrip('@').casefold()==expected
 
 def allowed_account(phone):
     value=normalize_phone(phone)

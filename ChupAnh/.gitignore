@@ -1,15 +1,14 @@
-.venv/
-__pycache__/
-*.py[cod]
+# This is a private credential-bearing source package. Do not publish it.
+private_defaults.py
+*.secret.json
 *.session*
 *.sqlite*
-.env
-.env.*
-telegram-images/
-build/
-dist/
-*.spec
-application.lock
+.venv/
 .build-venv/
 .venv-old-*/
 .build-venv-old-*/
+__pycache__/
+build/
+dist/
+*.spec
+*.py[cod]

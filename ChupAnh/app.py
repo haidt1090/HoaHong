@@ -11,7 +11,8 @@ from PySide6.QtWidgets import (QApplication,QMainWindow,QWidget,QFormLayout,QVBo
     QListWidgetItem,QListView,QAbstractItemView,QCheckBox,QMessageBox,QLabel,
     QTreeWidget,QTreeWidgetItem,QGroupBox,QSplitter,QSizePolicy)
 from PySide6.QtPrintSupport import QPrinterInfo,QPrintPreviewDialog
-from layout import PAPERS,PHOTOS
+from layout import PAPERS,PHOTOS,grid_slots,layout_kwargs
+from formats import DEFAULT_GEOMETRY,clean_format
 from printing import create_printer,render,PrintWorker,NativePrintJob,PDF_PRINTER,is_pdf_printer
 from spooler import WindowsSpooler,status_text
 _smoke_data=tempfile.TemporaryDirectory(prefix='chupanh-smoke-') if '--smoke-test' in sys.argv else None
@@ -22,7 +23,7 @@ GALLERY_LIMIT=100
 
 class Window(QMainWindow):
     def __init__(self):
-        super().__init__(); self.setWindowTitle('Telegram Photo Print 1.5.2 — Windows'); self.resize(1040,820)
+        super().__init__(); self.setWindowTitle('Telegram Photo Print 1.6 — Windows'); self.resize(1040,820)
         self.db=sqlite3.connect(BASE/'history.sqlite')
         self.db.execute('CREATE TABLE IF NOT EXISTS jobs (digest TEXT PRIMARY KEY,state TEXT,file TEXT)')
         self.db.execute('CREATE TABLE IF NOT EXISTS images (digest TEXT PRIMARY KEY,path TEXT,added REAL)')
@@ -43,6 +44,7 @@ class Window(QMainWindow):
         try: self.saved=json.loads(self.settings.read_text(encoding='utf-8'))
         except (OSError,ValueError): self.saved={}
         if not isinstance(self.saved,dict): self.saved={}
+        self.layout_format={key:self.saved.get(key,value) for key,value in DEFAULT_GEOMETRY.items()}
         (BASE/'inbox').mkdir(exist_ok=True)
         self.folder=QLineEdit(self.saved.get('folder',str(BASE/'inbox'))); self.folder.setReadOnly(True)
         self.recursive=QCheckBox('Đọc cả thư mục con'); self.recursive.setChecked(bool(self.saved.get('recursive',False)))
@@ -147,14 +149,16 @@ class Window(QMainWindow):
         if self.restore_paths: QTimer.singleShot(0,self.load_library_chunk)
     def snapshot(self):
         return {'paper':self.paper.currentText(),'photo':self.photo.currentText(),
-                'printer':self.printer.currentText(),'count':self.count.value()}
+                'printer':self.printer.currentText(),'count':self.count.value(),**self.layout_format}
     def write_settings(self):
         temporary=self.settings.with_suffix('.tmp')
         temporary.write_text(json.dumps(self.saved,ensure_ascii=False,indent=2),encoding='utf-8'); temporary.replace(self.settings)
     def save_settings(self):
         try:
             self.saved.update(self.snapshot()); self.saved.update(folder=self.folder.text(),recursive=self.recursive.isChecked(),auto_print=self.auto.isChecked(),pdf_folder=self.pdf_folder.text(),panel_sizes=self.splitter.sizes())
-            self.write_settings(); self.status.setText('Đã lưu máy in, khổ giấy, kích thước, số bản, thư mục và trạng thái tự động in.')
+            self.write_settings()
+            if self.telegram_dialog.ready and self.telegram_dialog.receiving_id is not None: self.telegram_dialog.save_connection()
+            self.status.setText('Đã lưu máy in, mẫu bố trí, số bản, thư mục và trạng thái tự động in'+(' đang BẬT.' if self.auto.isChecked() else ' đang TẮT.'))
         except OSError as exc: self.error(exc)
     def refresh_printers(self):
         preferred=self.printer.currentText() or self.saved.get('printer','')
@@ -287,11 +291,13 @@ class Window(QMainWindow):
         self.future=self.pool.submit(lambda:(generation,inventory(folder,recursive)))
     def setup(self,pdf=None): return create_printer(self.snapshot(),pdf)
     def draw(self,printer,path): render(printer,[path],self.snapshot())
+    def apply_format(self,settings,name=''):
+        values=clean_format(settings); self.paper.setCurrentText(values['paper']); self.photo.setCurrentText(values['photo']); self.count.setValue(values['count'])
+        self.layout_format={key:values[key] for key in DEFAULT_GEOMETRY}; self.saved['active_format']=name
     def preview(self):
         try:
-            entries=self.selected_entries(); paths=[path for path,_ in entries]; settings=self.snapshot()
-            printer=create_printer(settings,BASE/'preview.pdf'); dialog=QPrintPreviewDialog(printer,self)
-            dialog.paintRequested.connect(lambda p:render(p,paths,settings)); dialog.exec()
+            from preview_editor import PreviewEditor
+            self.preview_dialog=PreviewEditor(self,self.selected_entries(),BASE); self.preview_dialog.exec()
         except Exception as exc: self.error(exc)
     def ask_pdf_path(self):
         path,_=QFileDialog.getSaveFileName(self,'Lưu ảnh đã chọn thành PDF','anh-in.pdf','PDF (*.pdf)',options=QFileDialog.Option.DontUseNativeDialog)
@@ -312,6 +318,7 @@ class Window(QMainWindow):
     def send_batch(self,entries,automatic=False,pdf_output=None):
         if self.closing: return
         settings=self.snapshot()
+        grid_slots(settings['paper'],settings['photo'],**layout_kwargs(settings))
         if not settings['printer'] and not pdf_output: raise ValueError('Hãy chọn máy in trước khi in.')
         active=self.active_digests(); original_count=len(entries)
         entries=[(path,digest) for path,digest in entries if digest not in active]
@@ -411,14 +418,8 @@ class Window(QMainWindow):
         try: self.print_entries(entries)
         except Exception as exc: self.error(exc)
     def show_hotkey_help(self):
-        QMessageBox.information(self,'Hướng dẫn phím tắt',
-            'PHÒNG KHÁM ĐA KHOA Y CAO HOA HỒNG\nCÔNG TY TNHH DỊCH VỤ VÀ Y TẾ HUỆ LINH\n\n'
-            'Alt+1 … Alt+9: gửi in ngay ảnh ở vị trí 1 … 9, tính từ ảnh mới nhất trong khung.\n'
-            'Alt+A: gửi in tất cả ảnh mới CHƯA gửi in; bỏ qua ảnh đang chờ, đã gửi, đã xuất PDF hoặc cần kiểm tra.\n'
-            'F1 hoặc nút ?: mở hướng dẫn này.\n\n'
-            'Phím tắt chỉ hoạt động khi cửa sổ chính đang được sử dụng. In theo máy in, khổ giấy, kích thước và số bản hiện tại. '
-            'In tay và phím tắt gửi in ngay, không hỏi xác nhận. Nếu chọn PDF, phần mềm hỏi vị trí lưu. Bấm phím tắt không thay đổi các ảnh đang tích chọn.\n'
-            'Xóa tất cả tiến độ chỉ xóa lịch sử đã kết thúc, giữ nguyên các lệnh đang chạy/chờ trong Windows.')
+        from help_dialog import HelpDialog
+        self.help_dialog=HelpDialog(self,BASE); self.help_dialog.exec()
     def add_run(self,job):
         total=len(job['entries'])*job['settings']['count']; created=time.time()
         label=datetime.fromtimestamp(created).strftime('%H:%M:%S')+f" • {len(job['entries'])} ảnh × {job['settings']['count']}"

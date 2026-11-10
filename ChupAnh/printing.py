@@ -4,7 +4,7 @@ from pathlib import Path
 from PySide6.QtCore import QThread,QSizeF,QRectF,QSize,Qt,QObject,QTimer,Signal
 from PySide6.QtGui import QImageReader,QPainter,QPageSize,QPageLayout
 from PySide6.QtPrintSupport import QPrinter,QPrinterInfo
-from layout import PAPERS,batch_pages
+from layout import PAPERS,batch_pages,layout_kwargs
 from spooler import WindowsSpooler
 
 PDF_PRINTER='Xuất PDF trực tiếp'
@@ -45,7 +45,7 @@ def create_printer(settings,pdf=None):
 class RenderSession:
     def __init__(self,printer,paths,settings,progress=None):
         self.printer=printer; self.progress=progress; self.done=0; self.total=len(paths)*settings['count']
-        self.pages=iter(batch_pages(settings['paper'],settings['photo'],[(path,settings['count']) for path in paths]))
+        self.pages=iter(batch_pages(settings['paper'],settings['photo'],[(path,settings['count']) for path in paths],**layout_kwargs(settings)))
         self.placements=iter(()); self.page_index=-1; self.images={}
         self.factor=printer.resolution()/25.4; self.painter=QPainter()
         if not self.painter.begin(printer): raise RuntimeError('Không mở được tác vụ in')

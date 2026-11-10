@@ -37,7 +37,7 @@ class AppTests(unittest.TestCase):
     def setUpClass(cls): cls.qt=QApplication.instance() or QApplication([])
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(); self.base=Path(self.temp.name); self.vault=Vault()
-        self.patches=[patch.object(application,'BASE',self.base),
+        self.patches=[patch.dict(os.environ,{'CHUPANH_OFFLINE_TEST':'1'}),patch.object(application,'BASE',self.base),
             patch('telegram_ui.ConnectionStore',side_effect=lambda base:ConnectionStore(base,self.vault)),
             patch.object(application.QPrinterInfo,'availablePrinters',return_value=[SimpleNamespace(printerName=lambda:'Test printer')]),
             patch.object(application,'PrintWorker',FakePrintWorker),
