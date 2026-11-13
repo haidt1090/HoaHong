@@ -112,19 +112,38 @@ namespace DKS.QuickPay
             menu.ClientSize = new Size(640, 440);
             EventHandler save = delegate
             {
-                try { Save(health, record); status.Text = "Đã lưu máy in cho lần sau."; }
+                try { Save(health, record, settings); status.Text = "Đã lưu máy in cho lần sau."; }
                 catch (Exception ex) { status.Text = "Không lưu được máy in: " + ex.Message; }
             };
             health.SelectedIndexChanged += save; record.SelectedIndexChanged += save;
+            bool restoringTemplates = true;
+            templates.ItemCheck += delegate(object sender, ItemCheckEventArgs e)
+            {
+                if (restoringTemplates) return;
+                try
+                {
+                    // ItemCheck runs before CheckedItems changes: persist the proposed NewValue.
+                    var template = (Template)templates.Items[e.Index];
+                    settings.SetTemplateSelected(template.Id, e.NewValue == CheckState.Checked);
+                    Save(health, record, settings);
+                    status.Text = "Đã nhớ các mẫu đã chọn cho lần sau.";
+                }
+                catch (Exception ex) { status.Text = "Không lưu được mẫu đã chọn: " + ex.Message; }
+            };
             menu.Shown += delegate
             {
                 try
                 {
                     DataTable table = Property(grid, "DataSource") as DataTable;
                     if (table == null || table.Rows.Count == 0) throw new InvalidOperationException("Chưa có mẫu khám sức khỏe.");
-                    foreach (DataRow row in table.Rows) templates.Items.Add(new Template { Id = Convert.ToString(row["idthuthuat"]), Name = Convert.ToString(row["tenthuthuat"]) });
+                    foreach (DataRow row in table.Rows)
+                    {
+                        var template = new Template { Id = Convert.ToString(row["idthuthuat"]), Name = Convert.ToString(row["tenthuthuat"]) };
+                        templates.Items.Add(template, settings.IsTemplateSelected(template.Id));
+                    }
                 }
                 catch (Exception ex) { status.Text = ex.Message; print.Enabled = false; }
+                finally { restoringTemplates = false; }
             };
             print.Click += delegate
             {
@@ -139,7 +158,7 @@ namespace DKS.QuickPay
                     string healthPrinter = Convert.ToString(health.SelectedItem), recordPrinter = Convert.ToString(record.SelectedItem);
                     ValidatePrinter(healthPrinter); ValidatePrinter(recordPrinter);
                     if (templates.CheckedItems.Count == 0) throw new InvalidOperationException("Hãy tích chọn ít nhất một mẫu khám sức khỏe.");
-                    Save(health, record);
+                    Save(health, record, settings);
                     string patient = ((Control)Field(host, "txtidbenhnhan")).Text;
                     if (string.IsNullOrWhiteSpace(patient)) throw new InvalidOperationException("Chưa chọn bệnh nhân.");
                     var asm = chooser.GetType().Assembly;
@@ -185,8 +204,12 @@ namespace DKS.QuickPay
             string name = string.IsNullOrEmpty(saved) ? new PrinterSettings().PrinterName : saved;
             if (!string.IsNullOrEmpty(name)) { if (!combo.Items.Contains(name)) combo.Items.Add(name); combo.SelectedItem = name; }
         }
-        static void Save(ComboBox health, ComboBox record)
-        { new PrinterOptions { HealthPrinter = Convert.ToString(health.SelectedItem), RecordPrinter = Convert.ToString(record.SelectedItem) }.Save(); }
+        static void Save(ComboBox health, ComboBox record, PrinterOptions settings)
+        {
+            settings.HealthPrinter = Convert.ToString(health.SelectedItem);
+            settings.RecordPrinter = Convert.ToString(record.SelectedItem);
+            settings.Save();
+        }
         sealed class Template { public string Id; public string Name; public override string ToString() { return Name; } }
     }
 }

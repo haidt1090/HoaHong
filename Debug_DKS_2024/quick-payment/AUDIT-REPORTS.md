@@ -50,3 +50,5 @@ Bản vá gọi lại hàm tạo phiếu thu/xuất thuốc/ghi nhật ký gốc
 Để xác nhận số liệu, cần đối chiếu trên database thử: dùng cùng bộ lọc ngày/đối tượng/bác sĩ trước và sau một giao dịch gồm tiền khám + tiền thuốc; kiểm tra tổng thu, nhóm thu, công nợ, số lượt, nhật ký và tồn kho. Kiểm tra thêm giao dịch lỗi/thiếu tồn không để lại phiếu dang dở và bấm lại không thu trùng. Dữ liệu lịch sử đã thu trước đây chưa được kiểm tra hoặc thay đổi trong lần rà soát này.
 
 Có thể chạy lại công cụ trong thư mục `audit` với ba đối số: EXE gốc, EXE đã vá và đường dẫn JSON kết quả. `results.json` ghi đối chiếu EXE; các sửa phòng lỗi trong lần này nằm ở DLL adapter, không sửa thêm EXE/báo cáo.
+
+Chi tiết theo từng mục, dữ liệu đầu vào và cách đối soát: xem `REPORT-CHECKLIST.md`. Bổ sung lưu mẫu KSK chỉ sửa adapter in và cấu hình cục bộ; EXE và mã báo cáo không đổi trong lần này. Thêm 6 tình huống lưu dấu tích, tổng 34 tình huống đơn vị/giả lập đã qua.

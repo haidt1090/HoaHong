@@ -38,3 +38,4 @@ foreach (string id in new[] { "101120140002", "" })
     catch (InvalidOperationException) { }
 }
 Console.WriteLine("3 receipt-category scenarios passed (exam / pharmacy / missing).");
+TemplateSelectionTests.Run();

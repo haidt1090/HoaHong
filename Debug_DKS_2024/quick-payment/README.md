@@ -8,6 +8,10 @@
 
 Xem `AUDIT-REPORTS.md`: đã đối chiếu tất cả 10 mục (8 hiển thị, 2 ẩn), sửa lỗi có thể để sót trạng thái giao dịch khi giải phóng SQL transaction thất bại, và chặn loại phiếu thu khám bệnh không khớp mã báo cáo. Chưa đối chiếu số liệu trên SQL Server thực tế.
 
+## Nhớ các mẫu khám sức khỏe đã tích chọn
+
+Các dấu tích được lưu ngay theo mã mẫu, khôi phục khi mở lại cửa sổ hoặc khởi động lại phần mềm. Chỉ thay đổi khi bạn tích/bỏ tích; có thể nhớ nhiều mẫu cùng lúc, và bỏ hết cũng được lưu. Đổi máy in không xóa dấu tích. Dùng chung file cấu hình máy in tại LocalAppData; không sửa database. Cấu hình cũ chỉ có hai máy in vẫn đọc được. Xem `REPORT-CHECKLIST.md` để xem chi tiết rà soát từng mục báo cáo và phần đối soát thực tế còn thiếu.
+
 ## Cập nhật chương trình
 
 Tắt hoàn toàn DakhoasoSoft, pull repo hoặc chép **cả `DakhoasoSoft.exe` và `DKS.QuickPay.dll`** vào cùng thư mục đang có các DLL DevExpress 12.2. Chạy trực tiếp EXE, không dùng gói ClickOnce/manifest cũ. Không cần sửa chuỗi kết nối Registry, sửa schema/stored procedure database hay bật MSDTC. Bản sửa vẫn ghi giao dịch thu tiền và xuất thuốc vào database như các thao tác tương ứng.
