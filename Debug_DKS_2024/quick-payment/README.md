@@ -2,6 +2,10 @@
 
 Bấm **Thanh toán** trong màn hình Khám bệnh – Điều trị sẽ gọi bộ xử lý mới thay vì mở Mẫu phiếu thu số 2. Bộ xử lý dự kiến thu đủ phần còn nợ của tiền khám/thủ thuật và tất cả đơn thuốc của lần khám, mặc định tiền mặt, không ghi nợ, không dùng tạm ứng và không tự in. Vẫn hiện thông báo kết quả hoặc lỗi.
 
+## Sửa lỗi kết nối SQL
+
+Adapter giữ chuỗi kết nối trong biến cục bộ trước khi mở kết nối đầu tiên. Điều này tránh mất mật khẩu SQL khi `Persist Security Info=False`, vốn gây lỗi `Login failed for user sa` ở kết nối kiểm tra tiếp theo. Không bật Persist Security Info và không đổi mật khẩu SQL.
+
 ## Cách thử
 
 1. Sao lưu database, phục hồi thành database thử riêng và sao chép toàn bộ thư mục chương trình sang thư mục thử.

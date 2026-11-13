@@ -170,7 +170,9 @@ namespace DKS.QuickPay
                     var dbType = receipt.GetType().Assembly.GetType("_247Dental.Data.KetNoiCSDL_Data", true);
                     using (var connection = (SqlConnection)dbType.GetMethod("GetSQLConnection").Invoke(null, null))
                     {
-                        if (!new SqlConnectionStringBuilder(connection.ConnectionString).Enlist)
+                        // Capture before Open: SqlConnection removes credentials afterwards unless Persist Security Info is enabled.
+                        string transactionConnectionString = connection.ConnectionString;
+                        if (!new SqlConnectionStringBuilder(transactionConnectionString).Enlist)
                             throw new InvalidOperationException("Kết nối SQL phải bật Enlist để thanh toán nguyên khối.");
                         connection.Open();
                         using (var command = connection.CreateCommand())
@@ -186,7 +188,7 @@ namespace DKS.QuickPay
                             {
                                 // Original data access opens multiple connections. Require successful enlistment
                                 // before invoking any methods that may write; SQL/MSDTC failures abort this flow.
-                                using (var probe = new SqlConnection(connection.ConnectionString)) { probe.Open(); }
+                                using (var probe = new SqlConnection(transactionConnectionString)) { probe.Open(); }
                                 Call(receipt, "frm_PhieuThu2_Load", receipt, EventArgs.Empty);
                                 if (((ListControl)Field(receipt, "cbNguoithu")).SelectedValue == null ||
                                     ((ListControl)Field(receipt, "cbLoaikhoanthu")).SelectedValue == null ||
