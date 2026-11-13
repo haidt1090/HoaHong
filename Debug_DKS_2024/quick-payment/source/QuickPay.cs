@@ -178,6 +178,7 @@ namespace DKS.QuickPay
                                 ((ListControl)Field(receipt, "cbLoaikhoanthu")).SelectedValue == null ||
                                 string.IsNullOrWhiteSpace(Text(receipt, "txtNguoinop")))
                                 throw new InvalidOperationException("Thiếu thông tin người nộp, thu ngân hoặc loại khoản thu.");
+                            Rules.ValidateExamReceiptType(Convert.ToString(((ListControl)Field(receipt, "cbLoaikhoanthu")).SelectedValue));
                             Check(receipt, "chkGhino", false); Check(receipt, "chkTamung", false);
                             Check(receipt, "rbtTienMat", true); Check(receipt, "rbtChuyenKhoan", false);
                             string visit = Convert.ToString(Field(receipt, "_StrIDLankham"));

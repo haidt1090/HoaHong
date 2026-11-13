@@ -1,0 +1,184 @@
+{
+  "methods": 15324,
+  "changed": [
+    "System.Data.DataTable _247Dental.Data.KetNoiCSDL_Data::taobang(System.String)",
+    "System.Data.DataTable _247Dental.Data.KetNoiCSDL_Data::LayDuLieu(System.String)",
+    "System.Data.DataTable _247Dental.Data.KetNoiCSDL_Data::LayDuLieu(System.String,System.String[],System.Object[],System.Int32)",
+    "System.Int32 _247Dental.Data.KetNoiCSDL_Data::update(System.String)",
+    "System.Int32 _247Dental.Data.KetNoiCSDL_Data::update(System.String,System.String[],System.Object[],System.Int32)",
+    "System.Void _247Dental.Design.Work.uc_Nghiepvu::btnThanhtoan_Click(System.Object,System.EventArgs)",
+    "System.Void _247Dental.Design.Work.uc_Nghiepvu::btnInhoso_Click(System.Object,System.EventArgs)",
+    "System.Void _247Dental.Design.Work.uc_Nghiepvu::simpleButton3_Click(System.Object,System.EventArgs)"
+  ],
+  "reportClasses": 213,
+  "reportMethods": 3478,
+  "reportMethodChanges": [],
+  "embeddedResources": 213,
+  "resourcesEqual": true,
+  "entries": [
+    {
+      "handler": "barButtonItem1_ItemClick",
+      "unchanged": true,
+      "forms": [
+        "_247Dental.Design.BAOCAOTONGHOP.UC_DS_BENHNHAN_KHAMBENH"
+      ],
+      "formMethods": 32,
+      "formChanged": 0,
+      "dataCalls": [
+        "System.Void _247Dental.Data.Phanquyen_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.Phanquyen_Data::SelectByMATAIKHOANMAMN(System.String,System.String)",
+        "System.Void _247Dental.Data.Phongchidinh_data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.Phongchidinh_data::SelectAll()",
+        "System.Void _247Dental.Data.DoituongKhamBenh_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll_TruDoiTuongLaKhac()",
+        "System.Void _247Dental.Data.CTKhambenh_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.CTKhambenh_Data::SelectIdKhamBenh(System.DateTime,System.DateTime)",
+        "System.Data.DataTable _247Dental.Data.CTKhambenh_Data::SelectIdKhamBenh1(System.DateTime,System.DateTime,System.String)"
+      ]
+    },
+    {
+      "handler": "barButtonItem2_ItemClick",
+      "unchanged": true,
+      "forms": [
+        "_247Dental.Design.BAOCAO_BACSI.frm_BAOCAO_THUTHUAT_THEO_BACSI"
+      ],
+      "formMethods": 13,
+      "formChanged": 0,
+      "dataCalls": [
+        "System.Void _247Dental.Data.Phanquyen_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.Phanquyen_Data::SelectByMATAIKHOANMAMN(System.String,System.String)",
+        "System.Void _247Dental.Data.DoituongKhamBenh_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll_TruDoiTuongLaKhac()",
+        "System.Void _247Dental.Data.Nhanvien_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.Nhanvien_Data::SelectAll()"
+      ]
+    },
+    {
+      "handler": "barButtonItem3_ItemClick",
+      "unchanged": true,
+      "forms": [
+        "_247Dental.Design.BAOCAOTONGHOP.frm_DS_BENHNHAN_NOTIEN"
+      ],
+      "formMethods": 11,
+      "formChanged": 0,
+      "dataCalls": [
+        "System.Void _247Dental.Data.Phanquyen_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.Phanquyen_Data::SelectByMATAIKHOANMAMN(System.String,System.String)",
+        "System.Void _247Dental.Data.DoituongKhamBenh_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll_TruDoiTuongLaKhac()"
+      ]
+    },
+    {
+      "handler": "bntBaocaotonghopthuchi_ItemClick",
+      "unchanged": true,
+      "forms": [
+        "_247Dental.Design.BAOCAOTONGHOP.uc_TONGHOPTHUCHI"
+      ],
+      "formMethods": 9,
+      "formChanged": 0,
+      "dataCalls": [
+        "System.Void _247Dental.Data.Phanquyen_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.Phanquyen_Data::SelectByMATAIKHOANMAMN(System.String,System.String)",
+        "System.Void _247Dental.Data.DoituongKhamBenh_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll_TruDoiTuongLaKhac()"
+      ]
+    },
+    {
+      "handler": "bntBaoCaoThuTienKhamBenh_ItemClick",
+      "unchanged": true,
+      "forms": [
+        "_247Dental.Design._1_new_BAOCAO.uc_DS_THUTIEN_KHAMBENH"
+      ],
+      "formMethods": 11,
+      "formChanged": 0,
+      "dataCalls": [
+        "System.Void _247Dental.Data.Phanquyen_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.Phanquyen_Data::SelectByMATAIKHOANMAMN(System.String,System.String)",
+        "System.Void _247Dental.Data.DoituongKhamBenh_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll_TruDoiTuongLaKhac()"
+      ]
+    },
+    {
+      "handler": "bntTongHopKhamBenh_ItemClick",
+      "unchanged": true,
+      "forms": [
+        "_247Dental.Design.BAOCAO_BACSI.frm_BAOCAO_TONGHOP_KHAMBENH"
+      ],
+      "formMethods": 15,
+      "formChanged": 0,
+      "dataCalls": [
+        "System.Void _247Dental.Data.Phanquyen_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.Phanquyen_Data::SelectByMATAIKHOANMAMN(System.String,System.String)",
+        "System.Void _247Dental.Data.DoituongKhamBenh_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll_TruDoiTuongLaKhac()",
+        "System.Void _247Dental.Data.Nhomthuthuat_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.Nhomthuthuat_Data::SelectAll()"
+      ]
+    },
+    {
+      "handler": "barButtonItem10_ItemClick",
+      "unchanged": true,
+      "forms": [
+        "_247Dental.Update.Design.UCBaoCaoChamSocKhachHang"
+      ],
+      "formMethods": 9,
+      "formChanged": 0,
+      "dataCalls": [
+        "System.Void _247Dental.Data.Phanquyen_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.Phanquyen_Data::SelectByMATAIKHOANMAMN(System.String,System.String)"
+      ]
+    },
+    {
+      "handler": "barButtonItem12_ItemClick",
+      "unchanged": true,
+      "forms": [
+        "_247Dental.Design.BAOCAO_BACSI.frm_BAOCAO_TONGHOP_KHAMBENH"
+      ],
+      "formMethods": 15,
+      "formChanged": 0,
+      "dataCalls": [
+        "System.Void _247Dental.Data.Phanquyen_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.Phanquyen_Data::SelectByMATAIKHOANMAMN(System.String,System.String)",
+        "System.Void _247Dental.Data.DoituongKhamBenh_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll()",
+        "System.Data.DataTable _247Dental.Data.DoituongKhamBenh_Data::SelectAll_TruDoiTuongLaKhac()",
+        "System.Void _247Dental.Data.Nhomthuthuat_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.Nhomthuthuat_Data::SelectAll()"
+      ]
+    },
+    {
+      "handler": "barButtonItem8_ItemClick",
+      "unchanged": true,
+      "forms": [
+        "_247Dental.Design.BC_HH.frm_tinhhoahong"
+      ],
+      "formMethods": 10,
+      "formChanged": 0,
+      "dataCalls": [
+        "System.Void _247Dental.Data.Nhomthuthuat_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.Nhomthuthuat_Data::SelectAll()"
+      ]
+    },
+    {
+      "handler": "btnBaocaocongno_ItemClick",
+      "unchanged": true,
+      "forms": [
+        "_247Dental.Design._1_new_BAOCAO.Uc_Congnokhachcoquan"
+      ],
+      "formMethods": 13,
+      "formChanged": 0,
+      "dataCalls": [
+        "System.Void _247Dental.Data.BenhNhan_Data::.ctor()",
+        "System.Void _247Dental.Data.DanhMucCoquan_Data::.ctor()",
+        "System.Data.DataTable _247Dental.Data.DanhMucCoquan_Data::SelectAll()",
+        "System.Data.DataTable _247Dental.Data.BenhNhan_Data::Select_DS_KHACHCOQUAN(System.DateTime,System.DateTime,System.String)"
+      ]
+    }
+  ]
+}

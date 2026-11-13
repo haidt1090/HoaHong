@@ -30,3 +30,11 @@ System.IO.File.Delete(settingsFile);
 System.IO.Directory.Delete(System.IO.Path.GetDirectoryName(settingsFile));
 Console.WriteLine("2 printer persistence scenarios passed; no physical printer tested.");
 ReportTests.Run();
+
+Rules.ValidateExamReceiptType("101120140000");
+foreach (string id in new[] { "101120140002", "" })
+{
+    try { Rules.ValidateExamReceiptType(id); throw new Exception("Wrong receipt category accepted"); }
+    catch (InvalidOperationException) { }
+}
+Console.WriteLine("3 receipt-category scenarios passed (exam / pharmacy / missing).");

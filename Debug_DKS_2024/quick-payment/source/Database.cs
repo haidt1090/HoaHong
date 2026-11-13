@@ -77,7 +77,11 @@ namespace DKS.QuickPay
             public void Dispose()
             {
                 try { if (!completed && transaction.Connection != null) transaction.Rollback(); }
-                finally { transaction.Dispose(); if (ReferenceEquals(current, this)) current = null; }
+                finally
+                {
+                    try { transaction.Dispose(); }
+                    finally { if (ReferenceEquals(current, this)) current = null; }
+                }
             }
         }
     }

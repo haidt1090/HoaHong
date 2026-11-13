@@ -4,6 +4,10 @@
 
 Đã sửa lỗi `Property Get method was not found` ở In bệnh án và luồng in kèm Giấy Khám SK: thuộc tính `MyReport` của form gốc chỉ có setter; adapter đọc trường `reportMain` mà setter đó lưu vào. Cả hai đường in dùng chung bộ đọc này. Thêm 3 trường hợp kiểm tra: báo cáo đã gán, lớp kế thừa và báo cáo chưa có.
 
+## Rà soát Báo cáo – Thống kê
+
+Xem `AUDIT-REPORTS.md`: đã đối chiếu tất cả 10 mục (8 hiển thị, 2 ẩn), sửa lỗi có thể để sót trạng thái giao dịch khi giải phóng SQL transaction thất bại, và chặn loại phiếu thu khám bệnh không khớp mã báo cáo. Chưa đối chiếu số liệu trên SQL Server thực tế.
+
 ## Cập nhật chương trình
 
 Tắt hoàn toàn DakhoasoSoft, pull repo hoặc chép **cả `DakhoasoSoft.exe` và `DKS.QuickPay.dll`** vào cùng thư mục đang có các DLL DevExpress 12.2. Chạy trực tiếp EXE, không dùng gói ClickOnce/manifest cũ. Không cần sửa chuỗi kết nối Registry, sửa schema/stored procedure database hay bật MSDTC. Bản sửa vẫn ghi giao dịch thu tiền và xuất thuốc vào database như các thao tác tương ứng.
@@ -36,7 +40,7 @@ Nếu lỗi giữa chừng, có thể một số tài liệu đã vào hàng đ�
 ## Kiểm tra đã chạy
 
 - Build adapter .NET Framework 4.0 và công cụ vá: qua, không lỗi/cảnh báo.
-- 12 tình huống công nợ, 7 tình huống giao dịch cục bộ bằng ADO.NET fake (commit, rollback, lỗi bị bắt mất, khóa, cô lập theo thread), 2 tình huống lưu/đọc/cập nhật lựa chọn máy in: qua.
+- 12 tình huống công nợ, 8 tình huống giao dịch cục bộ bằng ADO.NET fake (commit, rollback, lỗi bị bắt mất, khóa, cô lập theo thread), 2 tình huống lưu/đọc/cập nhật lựa chọn máy in: qua.
 - Công cụ vá đối chiếu 15.324 phương thức: đúng 8 điểm được sửa; IL các phương thức còn lại và byte tài nguyên nhúng giữ nguyên.
 - Kiểm tra tên lớp/trường/hàm của adapter và API in trong DLL DevExpress 12.2 có trong repo.
 - **Chưa chạy Windows/SQL Server hoặc máy in vật lý.** Các test fake không chứng minh các stored procedure thực tế hay driver máy in hoạt động đúng.

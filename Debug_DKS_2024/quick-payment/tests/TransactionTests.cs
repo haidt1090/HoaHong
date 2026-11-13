@@ -43,12 +43,16 @@ static class TransactionTests
         c = new FakeConnection { DenyLock = true };
         try { Database.Begin(c); throw new Exception("Concurrent lock allowed"); } catch (InvalidOperationException) { }
         Assert(c.Rollbacks == 1 && !Database.IsActive(), "Lock failure leaked context"); passed++;
+        c = new FakeConnection { FailDispose = true };
+        try { using (var session = Database.Begin(c)) { Database.Write("Receipt"); } }
+        catch (ApplicationException) { }
+        Assert(!Database.IsActive(), "Cleanup exception leaked the payment context into later report queries"); passed++;
         Console.WriteLine(passed + " local-transaction scenarios passed using an ADO.NET fake (not SQL Server)."); return passed;
     }
     sealed class FakeConnection : IDbConnection
     {
         public int BeginCount, OpenCount, Commits, Rollbacks, CommandsWithWrongTransaction;
-        public bool DenyLock;
+        public bool DenyLock, FailDispose;
         public ArrayList Pending = new ArrayList(), Published = new ArrayList();
         public FakeTransaction Current;
         public string ConnectionString { get; set; }
@@ -65,7 +69,7 @@ static class TransactionTests
         public IDbConnection Connection => done ? null : connection; public IsolationLevel IsolationLevel => IsolationLevel.Serializable;
         public void Commit() { connection.Commits++; connection.Published.AddRange(connection.Pending); done = true; }
         public void Rollback() { connection.Rollbacks++; connection.Pending.Clear(); done = true; }
-        public void Dispose() { }
+        public void Dispose() { if (connection.FailDispose) throw new ApplicationException("Transaction cleanup failed"); }
     }
     sealed class FakeCommand : IDbCommand
     {
