@@ -1,4 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
 <PropertyGroup><TargetFramework>net40</TargetFramework><AssemblyName>DKS.QuickPay</AssemblyName><LangVersion>latest</LangVersion><GenerateAssemblyInfo>false</GenerateAssemblyInfo></PropertyGroup>
-<ItemGroup><PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net40" Version="1.0.3" PrivateAssets="all"/><Reference Include="System.Data"/><Reference Include="System.Windows.Forms"/><Reference Include="System.Transactions"/></ItemGroup>
+<ItemGroup><PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net40" Version="1.0.3" PrivateAssets="all"/><Reference Include="System.Data"/><Reference Include="System.Drawing"/><Reference Include="System.Windows.Forms"/></ItemGroup>
 </Project>

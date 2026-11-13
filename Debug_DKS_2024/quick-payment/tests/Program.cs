@@ -16,3 +16,16 @@ foreach (var a in new[] { new decimal[]{-1,0,0,0}, new decimal[]{1,-1,0,0}, new 
     catch (ArgumentOutOfRangeException) { passed++; }
 }
 Console.WriteLine(passed + " debt scenarios passed; runtime SQL/WinForms checks still required.");
+TransactionTests.Run();
+string settingsFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "DKS-printer-tests-" + Guid.NewGuid().ToString("N"), "printers.xml");
+if (System.IO.File.Exists(settingsFile)) System.IO.File.Delete(settingsFile);
+var choices = new PrinterOptions { HealthPrinter = "Máy in A3 \\PC\\KSK", RecordPrinter = "Máy in A4 bệnh án" };
+choices.SaveTo(settingsFile);
+var saved = PrinterOptions.ReadFrom(settingsFile);
+if (saved.HealthPrinter != choices.HealthPrinter || saved.RecordPrinter != choices.RecordPrinter) throw new Exception("Printer choices not restored independently");
+choices.RecordPrinter = "Máy thứ hai mới"; choices.SaveTo(settingsFile);
+saved = PrinterOptions.ReadFrom(settingsFile);
+if (saved.HealthPrinter != choices.HealthPrinter || saved.RecordPrinter != choices.RecordPrinter) throw new Exception("Printer update lost a choice");
+System.IO.File.Delete(settingsFile);
+System.IO.Directory.Delete(System.IO.Path.GetDirectoryName(settingsFile));
+Console.WriteLine("2 printer persistence scenarios passed; no physical printer tested.");

@@ -4,7 +4,6 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Globalization;
 using System.Reflection;
-using System.Transactions;
 using System.Windows.Forms;
 
 namespace DKS.QuickPay
@@ -77,8 +76,8 @@ namespace DKS.QuickPay
             DataTable exam = Table(New(f, "_247Dental.Data.Khambenh_Data"), "SelectByID", visit);
             if (cost.Rows.Count != 1 || exam.Rows.Count != 1 || paid.Rows.Count > 1)
                 throw new InvalidOperationException("Không xác định được công nợ lần khám.");
-            decimal gross = Money(cost.Rows[0]["Tongphaithanhtoan"]);
-            decimal discount = Money(cost.Rows[0]["Tonggoamgia"]);
+            decimal gross = cost.Rows[0]["Tongphaithanhtoan"] == DBNull.Value ? 0 : Money(cost.Rows[0]["Tongphaithanhtoan"]);
+            decimal discount = cost.Rows[0]["Tonggoamgia"] == DBNull.Value ? 0 : Money(cost.Rows[0]["Tonggoamgia"]);
             decimal coverage = Money(exam.Rows[0]["phantramduocchitra"]);
             decimal settled = paid.Rows.Count == 0 || paid.Rows[0]["TongDaThanhToan"] == DBNull.Value ? 0 : Money(paid.Rows[0]["TongDaThanhToan"]);
             if (gross < 0 || discount < 0 || coverage < 0 || coverage > 100 || settled < 0)
@@ -170,61 +169,37 @@ namespace DKS.QuickPay
                     var dbType = receipt.GetType().Assembly.GetType("_247Dental.Data.KetNoiCSDL_Data", true);
                     using (var connection = (SqlConnection)dbType.GetMethod("GetSQLConnection").Invoke(null, null))
                     {
-                        // Capture before Open: SqlConnection removes credentials afterwards unless Persist Security Info is enabled.
-                        string transactionConnectionString = connection.ConnectionString;
-                        if (!new SqlConnectionStringBuilder(transactionConnectionString).Enlist)
-                            throw new InvalidOperationException("Kết nối SQL phải bật Enlist để thanh toán nguyên khối.");
                         connection.Open();
-                        using (var command = connection.CreateCommand())
+                        decimal total = 0;
+                        using (var transaction = Database.Begin(connection))
                         {
-                            command.CommandText = "DECLARE @r int; EXEC @r=sys.sp_getapplock @Resource=N'DKS.QuickPay.All', @LockMode='Exclusive', @LockOwner='Session', @LockTimeout=0; SELECT @r;";
-                            if (Convert.ToInt32(command.ExecuteScalar()) < 0) throw new InvalidOperationException("Đang có giao dịch thanh toán khác. Vui lòng thử lại.");
-                        }
-                        try
-                        {
-                            decimal total = 0;
-                            var options = new TransactionOptions { IsolationLevel = System.Transactions.IsolationLevel.Serializable, Timeout = TimeSpan.FromMinutes(2) };
-                            using (var transaction = new TransactionScope(TransactionScopeOption.RequiresNew, options))
+                            Call(receipt, "frm_PhieuThu2_Load", receipt, EventArgs.Empty);
+                            if (((ListControl)Field(receipt, "cbNguoithu")).SelectedValue == null ||
+                                ((ListControl)Field(receipt, "cbLoaikhoanthu")).SelectedValue == null ||
+                                string.IsNullOrWhiteSpace(Text(receipt, "txtNguoinop")))
+                                throw new InvalidOperationException("Thiếu thông tin người nộp, thu ngân hoặc loại khoản thu.");
+                            Check(receipt, "chkGhino", false); Check(receipt, "chkTamung", false);
+                            Check(receipt, "rbtTienMat", true); Check(receipt, "rbtChuyenKhoan", false);
+                            string visit = Convert.ToString(Field(receipt, "_StrIDLankham"));
+                            DataTable prescriptions = Table(New(receipt, "_247Dental.Data.TranAnh_Donthuoc_Data"), "SelectByidkhambenh", visit);
+                            var processed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            foreach (DataRow row in prescriptions.Rows)
                             {
-                                // Original data access opens multiple connections. Require successful enlistment
-                                // before invoking any methods that may write; SQL/MSDTC failures abort this flow.
-                                using (var probe = new SqlConnection(transactionConnectionString)) { probe.Open(); }
-                                Call(receipt, "frm_PhieuThu2_Load", receipt, EventArgs.Empty);
-                                if (((ListControl)Field(receipt, "cbNguoithu")).SelectedValue == null ||
-                                    ((ListControl)Field(receipt, "cbLoaikhoanthu")).SelectedValue == null ||
-                                    string.IsNullOrWhiteSpace(Text(receipt, "txtNguoinop")))
-                                    throw new InvalidOperationException("Thiếu thông tin người nộp, thu ngân hoặc loại khoản thu.");
-                                Check(receipt, "chkGhino", false); Check(receipt, "chkTamung", false);
-                                Check(receipt, "rbtTienMat", true); Check(receipt, "rbtChuyenKhoan", false);
-                                string visit = Convert.ToString(Field(receipt, "_StrIDLankham"));
-                                DataTable prescriptions = Table(New(receipt, "_247Dental.Data.TranAnh_Donthuoc_Data"), "SelectByidkhambenh", visit);
-                                var processed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                                foreach (DataRow row in prescriptions.Rows)
-                                {
-                                    string id = Convert.ToString(row["idDonThuoc"]);
-                                    if (string.IsNullOrEmpty(id) || !processed.Add(id)) throw new InvalidOperationException("Mã đơn thuốc trống hoặc trùng.");
-                                    total += PayPrescription(receipt, id);
-                                }
-                                decimal exam = ExamDebt(receipt);
-                                if (exam > 0)
-                                {
-                                    Text(receipt, "txtSotien", Amount(exam));
-                                    Call(receipt, "thanhtoanthuthuat");
-                                    if (ExamDebt(receipt) != 0) throw new InvalidOperationException("Chưa lưu đủ tiền khám/thủ thuật.");
-                                    total += exam;
-                                }
-                                transaction.Complete();
+                                string id = Convert.ToString(row["idDonThuoc"]);
+                                if (string.IsNullOrEmpty(id) || !processed.Add(id)) throw new InvalidOperationException("Mã đơn thuốc trống hoặc trùng.");
+                                total += PayPrescription(receipt, id);
                             }
-                            MessageBox.Show(total > 0 ? "Đã thanh toán " + total.ToString("N0") + " đồng bằng tiền mặt." : "Lần khám này đã thanh toán đủ.", "Thanh toán", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        }
-                        finally
-                        {
-                            using (var command = connection.CreateCommand())
+                            decimal exam = ExamDebt(receipt);
+                            if (exam > 0)
                             {
-                                command.CommandText = "EXEC sys.sp_releaseapplock @Resource=N'DKS.QuickPay.All', @LockOwner='Session';";
-                                command.ExecuteNonQuery();
+                                Text(receipt, "txtSotien", Amount(exam));
+                                Call(receipt, "thanhtoanthuthuat");
+                                if (ExamDebt(receipt) != 0) throw new InvalidOperationException("Chưa lưu đủ tiền khám/thủ thuật.");
+                                total += exam;
                             }
+                            transaction.Complete();
                         }
+                        MessageBox.Show(total > 0 ? "Đã thanh toán " + total.ToString("N0") + " đồng bằng tiền mặt." : "Lần khám này đã thanh toán đủ.", "Thanh toán", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     return (int)DialogResult.OK;
                 }

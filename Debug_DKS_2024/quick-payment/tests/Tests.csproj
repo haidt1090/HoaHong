@@ -1,1 +1,1 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework><OutputType>Exe</OutputType></PropertyGroup><ItemGroup><Compile Include="../source/Rules.cs" Link="Rules.cs"/></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework><OutputType>Exe</OutputType></PropertyGroup><ItemGroup><Compile Include="../source/Rules.cs" Link="Rules.cs"/><Compile Include="../source/Database.cs" Link="Database.cs"/><Compile Include="../source/PrinterOptions.cs" Link="PrinterOptions.cs"/></ItemGroup></Project>
