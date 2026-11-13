@@ -29,3 +29,4 @@ if (saved.HealthPrinter != choices.HealthPrinter || saved.RecordPrinter != choic
 System.IO.File.Delete(settingsFile);
 System.IO.Directory.Delete(System.IO.Path.GetDirectoryName(settingsFile));
 Console.WriteLine("2 printer persistence scenarios passed; no physical printer tested.");
+ReportTests.Run();

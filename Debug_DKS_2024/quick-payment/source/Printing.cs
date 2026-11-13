@@ -61,7 +61,7 @@ namespace DKS.QuickPay
         {
             if (capturing)
             {
-                capturedReport = Property(preview, "MyReport");
+                capturedReport = ReportAccess.FromPreview(preview);
                 capturedPreview = (Form)preview;
                 return (int)DialogResult.OK;
             }
@@ -70,7 +70,7 @@ namespace DKS.QuickPay
             try
             {
                 ValidatePrinter(settings.RecordPrinter);
-                PrintReport(Property(preview, "MyReport"), settings.RecordPrinter);
+                PrintReport(ReportAccess.FromPreview(preview), settings.RecordPrinter);
                 return (int)DialogResult.OK;
             }
             catch (Exception e) { MessageBox.Show("Không in được bệnh án: " + e.Message, "In bệnh án", MessageBoxButtons.OK, MessageBoxIcon.Error); return (int)DialogResult.Cancel; }

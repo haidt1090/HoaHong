@@ -1,5 +1,9 @@
 # Thanh toán nhanh và in hai máy — bản thử
 
+## Sửa lỗi đọc báo cáo
+
+Đã sửa lỗi `Property Get method was not found` ở In bệnh án và luồng in kèm Giấy Khám SK: thuộc tính `MyReport` của form gốc chỉ có setter; adapter đọc trường `reportMain` mà setter đó lưu vào. Cả hai đường in dùng chung bộ đọc này. Thêm 3 trường hợp kiểm tra: báo cáo đã gán, lớp kế thừa và báo cáo chưa có.
+
 ## Cập nhật chương trình
 
 Tắt hoàn toàn DakhoasoSoft, pull repo hoặc chép **cả `DakhoasoSoft.exe` và `DKS.QuickPay.dll`** vào cùng thư mục đang có các DLL DevExpress 12.2. Chạy trực tiếp EXE, không dùng gói ClickOnce/manifest cũ. Không cần sửa chuỗi kết nối Registry, sửa schema/stored procedure database hay bật MSDTC. Bản sửa vẫn ghi giao dịch thu tiền và xuất thuốc vào database như các thao tác tương ứng.
