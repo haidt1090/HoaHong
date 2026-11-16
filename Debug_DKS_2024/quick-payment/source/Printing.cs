@@ -20,7 +20,9 @@ namespace DKS.QuickPay
         static object Property(object o, string name)
         {
             for (Type t = o.GetType(); t != null; t = t.BaseType)
-            { var p = t.GetProperty(name, Flags | BindingFlags.DeclaredOnly); if (p != null) return p.GetValue(o, null); }
+            { var p = t.GetProperty(name, Flags | BindingFlags.DeclaredOnly); if (p != null && p.GetGetMethod(true) != null) return p.GetValue(o, null); }
+            foreach (Type contract in o.GetType().GetInterfaces())
+            { var p = contract.GetProperty(name); if (p != null && p.GetGetMethod() != null) return p.GetValue(o, null); }
             throw new MissingMemberException(o.GetType().FullName, name);
         }
         static void Set(object o, string name, object value)
@@ -41,9 +43,33 @@ namespace DKS.QuickPay
                 throw new InvalidOperationException("Máy in không khả dụng: " + name + ". Hãy chọn lại máy in.");
         }
         static object NativePrinter(object rich) { return Property(rich, "Printer"); }
+        static void PrepareHealthPrint(object rich, string name)
+        {
+            HealthPageLayout.Apply(Property(rich, "Document"));
+            var capability = new PrinterSettings { PrinterName = name };
+            PaperSize a3 = null;
+            foreach (PaperSize size in capability.PaperSizes) if (size.Kind == PaperKind.A3) { a3 = size; break; }
+            bool pdf = string.Equals(name, "Microsoft Print to PDF", StringComparison.OrdinalIgnoreCase);
+            bool duplex = HealthPageLayout.UseDuplex(a3 != null, capability.CanDuplex, pdf);
+            // ComponentPrinter.PageSettings uses the same settings extender as PSPrintDocument.
+            object printer = NativePrinter(rich);
+            var page = (PageSettings)Property(printer, "PageSettings");
+            page.PrinterSettings.PrinterName = name;
+            page.PrinterSettings.Duplex = duplex ? Duplex.Horizontal : Duplex.Simplex;
+            page.PaperSize = a3; page.Landscape = true;
+            // Render now, before submitting any job. Reapply settings after the component's
+            // Initialize callback so it cannot reset the requested duplex mode.
+            object tool = Call(printer, "CreatePrintTool");
+            try { Call(tool, "BeforePrint"); }
+            finally { DisposeObject(tool); }
+            page = (PageSettings)Property(printer, "PageSettings");
+            page.PrinterSettings.PrinterName = name;
+            page.PrinterSettings.Duplex = duplex ? Duplex.Horizontal : Duplex.Simplex;
+            page.PaperSize = a3; page.Landscape = true;
+        }
         static void PrintRich(object rich, string name)
         {
-            // Same native ComponentPrinter path as RichEditControl.Print(), with an explicit printer.
+            // Health sections and the actual native print job were configured during preparation.
             object printer = NativePrinter(rich);
             Call(printer, "InvokeLinkMethod", "Print", new object[] { name });
         }
@@ -90,7 +116,7 @@ namespace DKS.QuickPay
             foreach (string name in PrinterSettings.InstalledPrinters) { health.Items.Add(name); record.Items.Add(name); }
             Restore(health, settings.HealthPrinter); Restore(record, settings.RecordPrinter);
             var templates = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, IntegralHeight = false };
-            var status = new Label { AutoSize = true, Text = "Tích chọn các mẫu cần in; bệnh án sẽ được in kèm.", Dock = DockStyle.Top, Height = 26 };
+            var status = new Label { AutoSize = true, Text = "Mẫu khám SK: A3 ngang, 2 mặt. Bệnh án in kèm khi có dữ liệu.", Dock = DockStyle.Top, Height = 26 };
             var print = new Button { Text = "Print", AutoSize = true };
             var close = (Control)Field(chooser, "btnThoat");
             close.Dock = DockStyle.None; close.Size = new Size(90, 30);
@@ -156,7 +182,7 @@ namespace DKS.QuickPay
                 {
                     menu.Cursor = Cursors.WaitCursor;
                     string healthPrinter = Convert.ToString(health.SelectedItem), recordPrinter = Convert.ToString(record.SelectedItem);
-                    ValidatePrinter(healthPrinter); ValidatePrinter(recordPrinter);
+                    ValidatePrinter(healthPrinter);
                     if (templates.CheckedItems.Count == 0) throw new InvalidOperationException("Hãy tích chọn ít nhất một mẫu khám sức khỏe.");
                     Save(health, record, settings);
                     string patient = ((Control)Field(host, "txtidbenhnhan")).Text;
@@ -174,16 +200,38 @@ namespace DKS.QuickPay
                         ((Control)rich).CreateControl();
                         string text = Convert.ToString(Property(Property(rich, "Document"), "Text"));
                         if (string.IsNullOrWhiteSpace(text)) throw new InvalidOperationException("Mẫu không có nội dung: " + template.Name);
-                        NativePrinter(rich); // Verify native printing support before submitting any document.
+                        PrepareHealthPrint(rich, healthPrinter);
                     }
-                    capturedReport = null; capturedPreview = null; capturing = true;
-                    try { Call(host, "btnInhoso_Click", host, EventArgs.Empty); report = capturedReport; preview = capturedPreview; }
-                    finally { capturing = false; capturedReport = null; capturedPreview = null; }
-                    if (report == null) throw new InvalidOperationException("Không tạo được bệnh án; chưa gửi lệnh in.");
-                    Call(report, "CreateDocument");
+                    // KSK templates need only a selected patient, not a paid service or an encounter.
+                    bool hasVisit = Convert.ToInt32(Property(Field(host, "gridViewDotKham"), "RowCount")) > 0 &&
+                        Convert.ToInt32(Property(Field(host, "gridViewDotKham"), "FocusedRowHandle")) >= 0;
+                    bool hasProcedures = Convert.ToInt32(Property(Field(host, "gridViewThuThuat"), "RowCount")) > 0;
+                    string recordNote = "";
+                    if (hasVisit)
+                    {
+                        capturedReport = null; capturedPreview = null; capturing = true;
+                        try { Call(host, "btnInhoso_Click", host, EventArgs.Empty); report = capturedReport; preview = capturedPreview; }
+                        catch
+                        {
+                            if (hasProcedures) throw;
+                            // An empty encounter must not prevent patient-only KSK printing.
+                            report = null; preview = capturedPreview;
+                        }
+                        finally { capturing = false; capturedReport = null; capturedPreview = null; }
+                    }
+                    if (report == null)
+                    {
+                        if (hasProcedures) throw new InvalidOperationException("Không tạo được bệnh án cho lần khám có thủ thuật; chưa gửi lệnh in.");
+                        recordNote = " Chưa có bệnh án để in kèm.";
+                    }
+                    else
+                    {
+                        ValidatePrinter(recordPrinter);
+                        Call(report, "CreateDocument");
+                    }
                     foreach (Form editor in documents) { PrintRich(Field(editor, "txtNoidungmauketqua"), healthPrinter); submitted++; }
-                    PrintReport(report, recordPrinter); submitted++;
-                    status.Text = "Đã gửi " + submitted + " tài liệu tới máy in.";
+                    if (report != null) { PrintReport(report, recordPrinter); submitted++; }
+                    status.Text = "Đã gửi " + submitted + " tài liệu tới máy in." + recordNote;
                 }
                 catch (Exception ex)
                 {

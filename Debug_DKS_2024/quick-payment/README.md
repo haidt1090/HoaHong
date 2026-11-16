@@ -12,6 +12,16 @@ Xem `AUDIT-REPORTS.md`: đã đối chiếu tất cả 10 mục (8 hiển thị,
 
 Các dấu tích được lưu ngay theo mã mẫu, khôi phục khi mở lại cửa sổ hoặc khởi động lại phần mềm. Chỉ thay đổi khi bạn tích/bỏ tích; có thể nhớ nhiều mẫu cùng lúc, và bỏ hết cũng được lưu. Đổi máy in không xóa dấu tích. Dùng chung file cấu hình máy in tại LocalAppData; không sửa database. Cấu hình cũ chỉ có hai máy in vẫn đọc được. Xem `REPORT-CHECKLIST.md` để xem chi tiết rà soát từng mục báo cáo và phần đối soát thực tế còn thiếu.
 
+## A3 ngang, hai mặt và in khi chưa có thủ thuật
+
+Mẫu giấy khám sức khỏe được đặt **A3 ngang** cho mọi section trước khi in, máy thứ nhất dùng **hai mặt lật cạnh ngắn** (`Duplex.Horizontal`). Chỗ chỉnh layout là `source/HealthPageLayout.cs`; chỗ gắn cấu hình máy in là `PrepareHealthPrint` trong `source/Printing.cs`. Bệnh án qua máy thứ hai giữ thiết lập/bố cục riêng, không bị ép sang A3 hoặc hai mặt bởi thay đổi này.
+
+Máy thứ nhất phải có A3 và hỗ trợ duplex tự động. Nếu driver không hỗ trợ A3/duplex thì báo rõ thay vì tự in một mặt hoặc đổi khổ. Riêng **Microsoft Print to PDF** tạo file A3 ngang, không yêu cầu duplex vật lý; chọn hai mặt khi in file PDF ra máy in thật. Driver PDF vẫn có thể hỏi tên file theo cơ chế Windows.
+
+Mẫu KSK chỉ cần có bệnh nhân đã chọn, không cần thêm thủ thuật, thanh toán hay lần khám giả. Nếu có lần khám thì vẫn thử dựng bệnh án bằng hàm gốc để in kèm; nếu chưa có lần khám hoặc không dựng được bệnh án khi chưa có thủ thuật, vẫn in các mẫu KSK và ghi trạng thái không có bệnh án kèm. Với lần khám đã có thủ thuật, lỗi dựng bệnh án vẫn được báo trước khi gửi bất kỳ tài liệu nào.
+
+7 tình huống layout A3 ngang và chính sách duplex đã qua bằng mô hình giả lập; tổng 41 tình huống đơn vị/giả lập đã qua. Chưa chạy trên máy in vật lý hoặc driver Windows của người dùng; cần thử một bệnh nhân chưa có thủ thuật và một bản hai mặt để xác nhận mặt sau đúng chiều.
+
 ## Cập nhật chương trình
 
 Tắt hoàn toàn DakhoasoSoft, pull repo hoặc chép **cả `DakhoasoSoft.exe` và `DKS.QuickPay.dll`** vào cùng thư mục đang có các DLL DevExpress 12.2. Chạy trực tiếp EXE, không dùng gói ClickOnce/manifest cũ. Không cần sửa chuỗi kết nối Registry, sửa schema/stored procedure database hay bật MSDTC. Bản sửa vẫn ghi giao dịch thu tiền và xuất thuốc vào database như các thao tác tương ứng.
