@@ -67,19 +67,26 @@ namespace DKS.QuickPay
             page.PrinterSettings.Duplex = duplex ? Duplex.Horizontal : Duplex.Simplex;
             page.PaperSize = a3; page.Landscape = true;
         }
-        static void PrintRich(object rich, string name)
+        static void PrintRich(object rich, string name, int copies)
         {
             // Health sections and the actual native print job were configured during preparation.
             object printer = NativePrinter(rich);
+            var settings = ((PageSettings)Property(printer, "PageSettings")).PrinterSettings;
+            settings.PrinterName = name; settings.Copies = checked((short)copies); settings.Collate = true;
             Call(printer, "InvokeLinkMethod", "Print", new object[] { name });
         }
-        static void PrintReport(object report, string name)
+        static void PrintReport(object report, string name, int copies = 1)
         {
             Call(report, "CreateDocument");
             var printing = Assembly.LoadFrom(Path.Combine(Application.StartupPath, "DevExpress.XtraPrinting.v12.2.dll"));
             object system = Property(report, "PrintingSystem");
             object tool = Activator.CreateInstance(printing.GetType("DevExpress.XtraPrinting.PrintTool", true), new object[] { system });
-            try { Call(tool, "Print", name); }
+            try
+            {
+                var settings = (PrinterSettings)Property(tool, "PrinterSettings");
+                settings.PrinterName = name; settings.Copies = checked((short)copies); settings.Collate = true;
+                Call(tool, "Print", name);
+            }
             finally { DisposeObject(tool); }
         }
         // Intercepts only the patient-record preview from uc_Nghiepvu.btnInhoso_Click.
@@ -115,6 +122,8 @@ namespace DKS.QuickPay
             var record = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
             foreach (string name in PrinterSettings.InstalledPrinters) { health.Items.Add(name); record.Items.Add(name); }
             Restore(health, settings.HealthPrinter); Restore(record, settings.RecordPrinter);
+            var healthCopies = new NumericUpDown { Minimum = 1, Maximum = 99, Value = 1, Dock = DockStyle.Fill };
+            var recordCopies = new NumericUpDown { Minimum = 1, Maximum = 99, Value = 1, Dock = DockStyle.Fill };
             var templates = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true, IntegralHeight = false };
             var status = new Label { AutoSize = true, Text = "Mẫu khám SK: A3 ngang, 2 mặt. Bệnh án in kèm khi có dữ liệu.", Dock = DockStyle.Top, Height = 26 };
             var print = new Button { Text = "Print", AutoSize = true };
@@ -122,12 +131,15 @@ namespace DKS.QuickPay
             close.Dock = DockStyle.None; close.Size = new Size(90, 30);
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, WrapContents = false };
             buttons.Controls.Add(close); buttons.Controls.Add(print);
-            var footer = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 114, ColumnCount = 2, RowCount = 3, Padding = new Padding(8) };
+            var footer = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 114, ColumnCount = 4, RowCount = 3, Padding = new Padding(8) };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 165)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 65)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 65));
             footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 30)); footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 30)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             footer.Controls.Add(new Label { Text = "Máy in giấy khám SK", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0); footer.Controls.Add(health, 1, 0);
             footer.Controls.Add(new Label { Text = "Máy in bệnh án", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1); footer.Controls.Add(record, 1, 1);
-            footer.Controls.Add(buttons, 0, 2); footer.SetColumnSpan(buttons, 2);
+            footer.Controls.Add(new Label { Text = "Số lượng", AutoSize = true, Anchor = AnchorStyles.Left }, 2, 0); footer.Controls.Add(healthCopies, 3, 0);
+            footer.Controls.Add(new Label { Text = "Số lượng", AutoSize = true, Anchor = AnchorStyles.Left }, 2, 1); footer.Controls.Add(recordCopies, 3, 1);
+            footer.Controls.Add(buttons, 0, 2); footer.SetColumnSpan(buttons, 4);
             var grid = (Control)Field(chooser, "gridControl2"); grid.Visible = false;
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -135,7 +147,7 @@ namespace DKS.QuickPay
             footer.Dock = DockStyle.Fill;
             layout.Controls.Add(status, 0, 0); layout.Controls.Add(templates, 0, 1); layout.Controls.Add(footer, 0, 2);
             menu.Controls.Add(layout); layout.BringToFront();
-            menu.ClientSize = new Size(640, 440);
+            menu.ClientSize = new Size(760, 440);
             EventHandler save = delegate
             {
                 try { Save(health, record, settings); status.Text = "Đã lưu máy in cho lần sau."; }
@@ -229,8 +241,19 @@ namespace DKS.QuickPay
                         ValidatePrinter(recordPrinter);
                         Call(report, "CreateDocument");
                     }
-                    foreach (Form editor in documents) { PrintRich(Field(editor, "txtNoidungmauketqua"), healthPrinter); submitted++; }
-                    if (report != null) { PrintReport(report, recordPrinter); submitted++; }
+                    int healthCount = Decimal.ToInt32(healthCopies.Value), recordCount = Decimal.ToInt32(recordCopies.Value);
+                    var healthDriver = new PrinterSettings { PrinterName = healthPrinter };
+                    foreach (Form editor in documents)
+                    {
+                        foreach (int count in CopyPlan.Jobs(healthCount, healthDriver.MaximumCopies))
+                        { PrintRich(Field(editor, "txtNoidungmauketqua"), healthPrinter, count); submitted += count; }
+                    }
+                    if (report != null)
+                    {
+                        var recordDriver = new PrinterSettings { PrinterName = recordPrinter };
+                        foreach (int count in CopyPlan.Jobs(recordCount, recordDriver.MaximumCopies))
+                        { PrintReport(report, recordPrinter, count); submitted += count; }
+                    }
                     status.Text = "Đã gửi " + submitted + " tài liệu tới máy in." + recordNote;
                 }
                 catch (Exception ex)

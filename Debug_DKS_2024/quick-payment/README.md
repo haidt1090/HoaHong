@@ -22,6 +22,14 @@ Mẫu KSK chỉ cần có bệnh nhân đã chọn, không cần thêm thủ thu
 
 7 tình huống layout A3 ngang và chính sách duplex đã qua bằng mô hình giả lập; tổng 41 tình huống đơn vị/giả lập đã qua. Chưa chạy trên máy in vật lý hoặc driver Windows của người dùng; cần thử một bệnh nhân chưa có thủ thuật và một bản hai mặt để xác nhận mặt sau đúng chiều.
 
+## Số lượng bản in
+
+Hai dòng máy in có ô **Số lượng** riêng, sửa được từ 1 đến 99. Mỗi mẫu KSK được tích sẽ in theo số lượng dòng thứ nhất; bệnh án theo số lượng dòng thứ hai. Ví dụ KSK=3, bệnh án=1 thì mỗi mẫu KSK in 3 bộ và bệnh án 1 bản. Đây là số bộ đầy đủ, không phải số trang. Mỗi lần mở cửa sổ số lượng mặc định về 1, không lưu theo bệnh nhân trước; máy in và dấu tích mẫu vẫn nhớ như cũ.
+
+Bộ in đặt `Copies` và `Collate` theo driver để in từng bộ đầy đủ; nếu driver giới hạn số bản mỗi lệnh, tách đủ số bộ thành nhiều lệnh. Driver Microsoft Print to PDF có thể hỏi tên file cho từng lệnh và không có cơ chế in hai mặt trên giấy. Chưa kiểm thử phần cứng thực tế.
+
+8 tình huống lập số lượng đã qua; cùng các kiểm tra trước có tổng 49 tình huống đơn vị/giả lập. EXE, thanh toán, database và mã báo cáo không thay đổi trong lần bổ sung ô số lượng này.
+
 ## Cập nhật chương trình
 
 Tắt hoàn toàn DakhoasoSoft, pull repo hoặc chép **cả `DakhoasoSoft.exe` và `DKS.QuickPay.dll`** vào cùng thư mục đang có các DLL DevExpress 12.2. Chạy trực tiếp EXE, không dùng gói ClickOnce/manifest cũ. Không cần sửa chuỗi kết nối Registry, sửa schema/stored procedure database hay bật MSDTC. Bản sửa vẫn ghi giao dịch thu tiền và xuất thuốc vào database như các thao tác tương ứng.
