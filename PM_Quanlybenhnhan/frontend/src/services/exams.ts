@@ -24,7 +24,7 @@ export interface ExamListParams {
 
 export const examsService = {
   list(params: ExamListParams = {}) {
-    return api.get<Paginated<ExamListItem>>('/examinations/', { params })
+    return api.get<Paginated<ExamListItem & { patient: string }>>('/examinations/', { params })
   },
 
   get(id: string) {

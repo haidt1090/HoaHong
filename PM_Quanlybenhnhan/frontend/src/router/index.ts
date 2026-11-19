@@ -140,6 +140,12 @@ const routes: RouteRecordRaw[] = [
         meta: { roles: ['admin'] as Role[] },
       },
       {
+        path: 'report-print',
+        name: 'report-print',
+        component: () => import('@/pages/reports/ReportPrintPage.vue'),
+        meta: { roles: ['admin'] as Role[] },
+      },
+      {
         path: 'sync/signatures',
         name: 'doctor-signatures',
         component: () => import('@/pages/sync/DoctorSignaturePage.vue'),

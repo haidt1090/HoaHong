@@ -58,6 +58,7 @@ const MENU_BY_ROLE: Record<Role, MenuItemDef[]> = {
     { label: 'Ký USB', icon: 'pi pi-key', to: '/sync/usb-signer' },
     { label: 'Mapping XML', icon: 'pi pi-link', to: '/sync/mapping' },
     { label: 'Chữ ký số', icon: 'pi pi-pencil', to: '/sync/signatures' },
+    { label: 'In Báo Cáo', icon: 'pi pi-print', to: '/report-print' },
   ],
   doctor: [
     { label: 'Tổng quan', icon: 'pi pi-home', to: '/' },
