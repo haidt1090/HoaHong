@@ -1,0 +1,64 @@
+.fields-config-builder {
+  margin: 6px 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.fields-config-builder .fcb-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+
+.fields-config-builder .fcb-table th,
+.fields-config-builder .fcb-table td {
+  border: 1px solid #e0e0e0;
+  padding: 4px 6px;
+  vertical-align: middle;
+  text-align: left;
+}
+
+.fields-config-builder .fcb-table th {
+  background: #f6f6f6;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fields-config-builder .fcb-center {
+  text-align: center;
+}
+
+.fields-config-builder .fcb-input {
+  width: 100%;
+  min-width: 70px;
+  box-sizing: border-box;
+  padding: 3px 4px;
+}
+
+.fields-config-builder .fcb-label {
+  min-width: 140px;
+}
+
+.fields-config-builder .fcb-min,
+.fields-config-builder .fcb-max,
+.fields-config-builder .fcb-price {
+  min-width: 60px;
+}
+
+.fields-config-builder .fcb-add {
+  margin-top: 8px;
+}
+
+.fields-config-builder .fcb-remove {
+  background: #ba2121;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.fields-config-builder .fcb-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+}

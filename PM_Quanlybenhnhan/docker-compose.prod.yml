@@ -1,0 +1,141 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      ksk_networks:
+        ipv4_address: 10.34.224.20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      ksk_networks:
+        ipv4_address: 10.34.224.21
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 300 --access-logfile -
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app/src
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    volumes:
+      - ./media:/app/src/media
+      - ./private_media:/app/src/private_media
+      - static_files:/app/src/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+    networks:
+      ksk_networks:
+        ipv4_address: 10.34.224.10
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    command: celery -A config worker -l warning --concurrency=2
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app/src
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    volumes:
+      - ./media:/app/src/media
+      - ./private_media:/app/src/private_media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      ksk_networks:
+        ipv4_address: 10.34.224.13
+
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    command: celery -A config beat -l warning --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app/src
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      ksk_networks:
+        ipv4_address: 10.34.224.14
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /khamsk/api
+    volumes:
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+
+    networks:
+      ksk_networks:
+        ipv4_address: 10.34.224.11
+
+  nginx:
+    image: nginx:1.27-alpine
+    # ports:
+      # - "80:80"
+      # - "443:443"
+    volumes:
+      - ./nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_files:/app/staticfiles:ro
+      - ./media:/app/media:ro
+      - ./nginx/certbot:/var/www/certbot:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - web
+      - frontend
+    restart: unless-stopped
+
+    networks:
+      ksk_networks:
+        ipv4_address: 10.34.224.12
+
+volumes:
+  postgres_data:
+  static_files:
+
+networks:
+  ksk_networks:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.34.224.0/24

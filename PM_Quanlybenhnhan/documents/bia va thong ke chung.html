@@ -1,0 +1,53 @@
+<h2 style="font-size: 12pt; font-weight: bold;">I. TÌNH HÌNH SỨC KHỎE CHUNG</h2>
+<p style="font-size: 12pt;"><strong>1. Tổng hợp số lượng cán bộ công nhân viên tham gia khám:</strong></p>
+<ul>
+  <li style="font-size: 12pt;">Tổng số CBNV đến khám: <b>{{ stats.total }}</b> người.</li>
+  <li style="font-size: 12pt;">Nam: <b>{{ stats.male }}</b> người ({{ stats.male_pct }}%).</li>
+  <li style="font-size: 12pt;">Nữ: <b>{{ stats.female }}</b> người ({{ stats.female_pct }}%).</li>
+</ul>
+
+<div class="report-row">
+  <div class="report-grid-item" data-column="3" data-width="7">
+    <p style="text-align: center; font-size: 12pt;"><strong>Bảng 1.1: Số CBNV đăng ký khám</strong></p>
+  </div>
+</div>
+<div class="report-row">
+  <div class="report-grid-item" data-column="3" data-width="7">
+    {% gender_table %}
+  </div>
+</div>
+
+<h2 data-excel-gap="1" style="font-size: 12pt; font-weight: bold;">II. BẢNG PHÂN LOẠI SỨC KHỎE</h2>
+<p style="font-size: 12pt;"><b>1. Phân loại sức khỏe:</b></p>
+<p style="font-size: 12pt;">(Theo tiêu chuẩn phân loại ban hành tại Quyết định số 1613 BYT/QĐ ngày 15/08/1997 của Bộ Y tế)</p>
+
+<div class="report-row">
+  <div class="report-grid-item" data-column="1" data-width="7">
+    <p style="font-size: 12pt; text-align: center;">Bảng 2.1: Bảng phân loại sức khỏe của CBNV</p>
+  </div>
+</div>
+<div class="report-row">
+  <div class="report-grid-item" data-column="1" data-width="7">
+    {% classification_table %}
+  </div>
+  <div class="report-grid-item" data-column="8" data-width="8">
+    {% classification_chart %}
+  </div>
+</div>
+
+<h2 data-excel-gap="3" style="font-size: 12pt; font-weight: bold;">III. TÌNH HÌNH BỆNH TẬT</h2>
+<div class="report-row">
+  <div class="report-grid-item" data-column="2" data-width="9">
+    <p style="font-size: 12pt; text-align: center;">Bảng 3.0: Tỷ lệ bình thường và bất thường theo từng nhóm khám</p>
+  </div>
+</div>
+<div class="report-row">
+  <div class="report-grid-item" data-column="2" data-width="9">
+    {% group_overview_table %}
+  </div>
+  <div class="report-grid-item" data-column="11" data-width="5">
+    {% group_overview_chart %}
+  </div>
+</div>
+
+

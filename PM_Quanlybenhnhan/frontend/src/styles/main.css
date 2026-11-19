@@ -1,0 +1,30 @@
+@import 'tailwindcss';
+@import 'tailwindcss-primeui';
+
+@theme {
+  --color-primary: #0a7c6e;
+  --color-primary-dark: #086b5e;
+  --color-secondary: #4a90d9;
+  --color-success: #27ae60;
+  --color-warning: #f39c12;
+  --color-danger: #e74c3c;
+  --color-bg-page: #f5f7fa;
+  --color-text-body: #1a1a2e;
+  --color-text-muted: #6b7280;
+
+  --font-sans: 'Inter', 'Be Vietnam Pro', sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: var(--color-bg-page);
+  color: var(--color-text-body);
+  font-family: var(--font-sans);
+}
+
+#app {
+  min-height: 100vh;
+}

@@ -1,0 +1,31 @@
+Django>=5.1,<5.2
+djangorestframework>=3.15,<4.0
+django-filter>=24.0,<25.0
+django-environ>=0.11,<1.0
+django-cors-headers>=4.4,<5.0
+djangorestframework-simplejwt>=5.3,<6.0
+gunicorn>=22.0,<23.0
+psycopg[binary]>=3.1,<4.0
+redis>=6.1.0
+celery[redis]>=5.4,<6.0
+django-celery-beat>=2.7,<3.0
+django-celery-results>=2.5,<3.0
+WeasyPrint>=62,<63
+# WeasyPrint 62.x targets the pydyf 0.10 API; pydyf >=0.11 renamed the stream
+# transform methods and breaks PDF generation with
+# "AttributeError: 'super' object has no attribute 'transform'".
+pydyf>=0.10,<0.11
+openpyxl>=3.1,<4.0
+pgvector>=0.3,<1.0
+# sentence-transformers (Sprint 8 vector search) — not installed until
+# embed_text is implemented; it pulls PyTorch (~hundreds of MB).
+qrcode>=7.4,<8.0
+drf-spectacular>=0.28,<1.0
+whitenoise>=6.7,<7.0
+django-storages>=1.14,<2.0
+pillow>=10.4,<11.0
+django-debug-toolbar>=4.4,<5.0
+django-simple-history>=3.7,<4.0
+django-filter
+cryptography>=43.0,<48.0
+requests>=2.32,<3.0

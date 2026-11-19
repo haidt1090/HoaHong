@@ -1,0 +1,8 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+  <li>
+    <a href="{% url 'admin:reports_template_guide' %}" class="viewlink">Hướng dẫn mã</a>
+  </li>
+  {{ block.super }}
+{% endblock %}

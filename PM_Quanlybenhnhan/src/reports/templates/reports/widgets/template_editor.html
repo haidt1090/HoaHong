@@ -1,0 +1,52 @@
+{% load static %}
+<div class="rt-editor"
+     data-editor-root
+     data-preview-kind="{{ widget.preview_kind }}"
+     data-variables="{{ widget.variable_groups_json }}">
+
+  <div class="rt-editor__toolbar">
+    <button type="button" class="rt-editor__btn" data-action="toggle-vars">
+      Chèn biến
+    </button>
+    {% if widget.preview_kind %}
+    <button type="button" class="rt-editor__btn" data-action="preview">
+      Xem trước
+    </button>
+    {% endif %}
+    <button type="button" class="rt-editor__btn" data-action="wrap-loop">
+      Bọc vòng lặp chỉ số
+    </button>
+    {% if widget.guide_url %}
+    <a class="rt-editor__btn" href="{{ widget.guide_url }}" target="_blank" rel="noopener">
+      Hướng dẫn mã
+    </a>
+    {% endif %}
+    <span class="rt-editor__status" data-status></span>
+  </div>
+
+  <div class="rt-editor__body">
+    <div class="rt-editor__pane">
+      <div class="rt-editor__gutter" data-gutter aria-hidden="true"></div>
+      <div class="rt-editor__surface">
+        <pre class="rt-editor__highlight" data-highlight aria-hidden="true"></pre>
+        <textarea name="{{ widget.name }}"
+                  data-source
+                  {% include "django/forms/widgets/attrs.html" %}>{% if widget.value %}{{ widget.value }}{% endif %}</textarea>
+      </div>
+    </div>
+
+    <aside class="rt-editor__vars" data-vars hidden>
+      <input type="search" class="rt-editor__search" data-var-search
+             placeholder="Tìm biến…" autocomplete="off">
+      <div class="rt-editor__var-list" data-var-list></div>
+    </aside>
+  </div>
+
+  <div class="rt-editor__preview" data-preview hidden>
+    <div class="rt-editor__preview-bar">
+      <strong>Xem trước</strong>
+      <button type="button" class="rt-editor__btn" data-action="close-preview">Đóng</button>
+    </div>
+    <iframe data-preview-frame title="Xem trước template"></iframe>
+  </div>
+</div>

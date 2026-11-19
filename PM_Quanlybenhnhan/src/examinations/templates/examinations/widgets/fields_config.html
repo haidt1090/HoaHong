@@ -1,0 +1,27 @@
+<div class="fields-config-builder" data-field-name="{{ widget.name }}">
+  <table class="fcb-table">
+    <thead>
+      <tr>
+        <th>Nhãn (label)</th>
+        <th>Loại</th>
+        <th>Đơn vị</th>
+        <th>Bắt buộc</th>
+        <th>Min</th>
+        <th>Max</th>
+        <th>Giá mặc định</th>
+        <th>Nhóm XN</th>
+        <th>Tùy chọn<br><small>(select, cách nhau dấu phẩy)</small></th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody class="fcb-rows"></tbody>
+  </table>
+  <button type="button" class="fcb-add button">+ Thêm trường</button>
+  <p class="fcb-error" style="color:#ba2121;"></p>
+  <textarea
+    name="{{ widget.name }}"
+    id="id_{{ widget.name }}"
+    class="fcb-json"
+    style="display:none;"
+  >{{ widget.value }}</textarea>
+</div>

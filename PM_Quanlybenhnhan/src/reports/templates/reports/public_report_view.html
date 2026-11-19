@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kết quả khám — {{ patient.full_name }}</title>
+<style>{{ css|safe }}</style>
+</head>
+<body>
+
+<h1>Kết quả khám sức khoẻ</h1>
+<div class="info-box">
+  <p><b>{{ patient.full_name }}</b> — Ngày khám: {{ exam_date }}</p>
+</div>
+
+<div class="result-panel">{{ html_result|safe }}</div>
+<!-- <a href="/kq/" class="back-link">← Tra cứu kết quả khác</a> -->
+
+</body>
+</html>

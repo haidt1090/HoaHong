@@ -1,0 +1,80 @@
+<div class="gender-override-widget" id="gov-root-{{ widget.name }}">
+  <table class="gov-table" style="border-collapse:collapse;">
+    <thead>
+      <tr>
+        <th></th>
+        <th>Min</th>
+        <th>Max</th>
+        <th>Step</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="font-weight:bold;">Nam</td>
+        <td><input type="text" class="gov-min gov-M" size="6" /></td>
+        <td><input type="text" class="gov-max gov-M" size="6" /></td>
+        <td><input type="text" class="gov-step gov-M" size="6" /></td>
+      </tr>
+      <tr>
+        <td style="font-weight:bold;">Nữ</td>
+        <td><input type="text" class="gov-min gov-F" size="6" /></td>
+        <td><input type="text" class="gov-max gov-F" size="6" /></td>
+        <td><input type="text" class="gov-step gov-F" size="6" /></td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="gov-hint" style="color:#777; margin:4px 0 0;">
+    Để trống = dùng Min/Max chung của trường. Step (vd. 0.2) dùng khi random seed:
+    chọn trên lưới min, min+step, … tới max. Bỏ trống Step → mặc định 0.1.
+  </p>
+  <textarea
+    name="{{ widget.name }}"
+    id="id_{{ widget.name }}"
+    class="gov-json"
+    style="display:none;"
+  >{{ widget.value }}</textarea>
+</div>
+<script>
+(function () {
+  var root = document.getElementById("gov-root-{{ widget.name }}");
+  if (!root) return;
+  var ta = root.querySelector(".gov-json");
+  // Bounds must be stored as numbers: the frontend does arithmetic on them,
+  // and a quoted "4.5" makes `min + x` concatenate instead of add.
+  function asNumber(v) {
+    var n = Number(v);
+    return isFinite(n) ? n : v;
+  }
+  function syncToJson() {
+    var out = {};
+    ["M", "F"].forEach(function (g) {
+      var min = root.querySelector(".gov-min.gov-" + g).value.trim();
+      var max = root.querySelector(".gov-max.gov-" + g).value.trim();
+      var step = root.querySelector(".gov-step.gov-" + g).value.trim();
+      if (min || max || step) {
+        var entry = {};
+        if (min) entry.min = asNumber(min);
+        if (max) entry.max = asNumber(max);
+        if (step) entry.step = asNumber(step);
+        out[g] = entry;
+      }
+    });
+    ta.value = JSON.stringify(out);
+  }
+  function syncFromJson() {
+    var raw = ta.value.trim();
+    var data = {};
+    try { data = JSON.parse(raw || "{}"); } catch (e) { data = {}; }
+    ["M", "F"].forEach(function (g) {
+      var e = data[g] || {};
+      root.querySelector(".gov-min.gov-" + g).value = e.min !== undefined ? e.min : "";
+      root.querySelector(".gov-max.gov-" + g).value = e.max !== undefined ? e.max : "";
+      root.querySelector(".gov-step.gov-" + g).value = e.step !== undefined ? e.step : "";
+    });
+  }
+  root.querySelectorAll("input").forEach(function (inp) {
+    inp.addEventListener("input", syncToJson);
+  });
+  syncFromJson();
+})();
+</script>

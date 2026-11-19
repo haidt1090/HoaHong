@@ -1,0 +1,34 @@
+<table style="width:100%; border:0; border-collapse:collapse;">
+  <tr>
+    <td rowspan="2" style="width:240px; border:0; vertical-align:middle; text-align:left;">
+      {% if logo_url %}<img src="{{ logo_url }}" style="width:240px;">{% endif %}
+    </td>
+    <td style="border:0; vertical-align:middle; text-align:center;">
+      <div style="font-size:13pt; font-weight:bold; text-transform:uppercase;">
+        CÔNG TY TNHH DỊCH VỤ Y TẾ VÀ THƯƠNG MẠI HUỆ LINH
+      </div>
+      <div style="font-size:13pt; font-weight:bold; text-transform:uppercase;">
+        {{ clinic_name }}
+      </div>
+      <div style="font-size:8pt;">
+        {% if clinic_address %}{{ clinic_address }}{% endif %}
+        {% if clinic_phone %}SĐT: {{ clinic_phone }}{% endif %}
+      </div>
+    </td>
+    <td rowspan="2" style="width:240px; border:0;"></td>
+  </tr>
+  <tr>
+    <td style="border:0; vertical-align:middle; text-align:center;">
+      <div style="font-size:12pt; font-weight:bold; text-transform:uppercase;">
+        TỔNG HỢP KHÁM SỨC KHỎE ĐỊNH KỲ {{ company.name|upper }}
+      </div>
+    </td>
+  </tr>
+</table>
+
+<div style="text-align:left; margin-top:2mm; font-size:9pt; color:#333;">
+1. Thời gian khám sức khỏe: <b>{% if exam_date %}{{ exam_date }}{% else %}Tất cả ngày khám{% endif %}</b><br>
+2. Địa điểm khám sức khỏe: Tại công ty<br>
+3. Số lượng CB CNV thực tế tham gia khám sức khỏe: <b>{{ total_employees }}</b> người<br>
+4. Kết quả tổng hợp:
+</div>

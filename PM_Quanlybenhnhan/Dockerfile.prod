@@ -1,0 +1,71 @@
+# syntax=docker/dockerfile:1
+# Same image is used for web, Celery worker, and beat.
+# Do not add HEALTHCHECK here — worker/beat do not listen on :8000.
+
+FROM python:3.12-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_ROOT_USER_ACTION=ignore
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements/ ./requirements/
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip \
+    && pip install -r requirements/prod.txt
+
+
+FROM python:3.12-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        # WeasyPrint runtime
+        libpango-1.0-0 \
+        libpangocairo-1.0-0 \
+        libpangoft2-1.0-0 \
+        libcairo2 \
+        libgdk-pixbuf-2.0-0 \
+        libharfbuzz-subset0 \
+        libffi8 \
+        libjpeg62-turbo \
+        libopenjp2-7 \
+        shared-mime-info \
+        fontconfig \
+        # Fonts with Vietnamese coverage
+        fonts-dejavu-core \
+        fonts-liberation2 \
+        fonts-noto-core \
+        gosu \
+    && rm -rf /var/lib/apt/lists/* \
+    && fc-cache -f \
+    && useradd --create-home --uid 1000 --shell /usr/sbin/nologin appuser \
+    && mkdir -p /app/src/media /app/src/staticfiles /app/src/logs \
+    && chown -R appuser:appuser /app
+
+COPY --from=builder /opt/venv /opt/venv
+COPY --chown=appuser:appuser src/ ./src/
+COPY --chmod=755 docker/entrypoint.sh /app/docker/entrypoint.sh
+
+EXPOSE 8000
+
+ENTRYPOINT ["/app/docker/entrypoint.sh"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "300"]

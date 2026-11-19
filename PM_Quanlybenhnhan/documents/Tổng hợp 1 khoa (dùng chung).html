@@ -1,0 +1,26 @@
+<div class="report-row" data-excel-gap="3">
+  <div class="report-grid-item" data-column="1" data-width="9">
+    <p>3.{{ group_index }}. {{ department.template_name }}</p>
+  </div>
+</div>
+<div class="report-row">
+  <div class="report-grid-item" data-column="4" data-width="9">
+    {% dept_summary %}
+  </div>
+</div>
+
+{% if group.diseases %}
+<div class="report-row" data-excel-gap="1">
+  <div class="report-grid-item" data-column="1" data-width="9">
+    <p>Bảng 3.{{ group_index }}: Phân loại bệnh lý {{ department.template_name }}</p>
+  </div>
+</div>
+<div class="report-row">
+  <div class="report-grid-item" data-column="1" data-width="9">
+    {% dept_disease_table %}
+  </div>
+  <div class="report-grid-item" data-column="10" data-width="6">
+    {% dept_chart type="pie" %}
+  </div>
+</div>
+{% endif %}

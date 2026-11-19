@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kết quả khám — {{ patient_name }}</title>
+<style>{{ css|safe }}</style>
+</head>
+<body>
+
+<h1>Kết quả khám sức khoẻ</h1>
+
+<div class="info-box">
+  <p><b>{{ patient_name }}</b></p>
+  <p>Ngày khám: {{ exam_date }}</p>
+</div>
+
+<form method="post" class="login-box">
+  {% csrf_token %}
+  <label for="id_password">Nhập mật khẩu để xem kết quả</label>
+  <input id="id_password" name="password" type="password" required
+         placeholder="4 số cuối CCCD + ngày sinh">
+  <button type="submit">Xem kết quả</button>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+</form>
+
+<!-- <a href="/kq/" class="back-link">← Tra cứu lại</a> -->
+
+</body>
+</html>

@@ -1,0 +1,63 @@
+{% extends "admin/change_form.html" %}
+
+{% block admin_change_form_document_ready %}
+  {{ block.super }}
+  <script>
+  (function() {
+    "use strict";
+
+    var packageExamTypeUrl = "/admin/examinations/examination/package-exam-type/";
+
+    function byIdOrName(id, name) {
+      return document.getElementById(id) || document.querySelector('[name="' + name + '"]');
+    }
+
+    function getPackageId() {
+      var packageEl = byIdOrName("id_exam_package", "exam_package");
+      if (!packageEl) return "";
+      return packageEl.value || "";
+    }
+
+    function setExamType(value) {
+      var examTypeEl = byIdOrName("id_exam_type", "exam_type");
+      if (!examTypeEl) return;
+      examTypeEl.value = value || "";
+      examTypeEl.dispatchEvent(new Event("change", {bubbles: true}));
+    }
+
+    function syncExamTypeFromPackage() {
+      var packageId = getPackageId();
+      if (!packageId) return;
+
+      var url = packageExamTypeUrl + "?package_id=" + encodeURIComponent(packageId);
+      fetch(url, {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function(response) {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          return response.json();
+        })
+        .then(function(data) {
+          if (data.exam_type) setExamType(data.exam_type);
+        })
+        .catch(function(error) {
+          console.error("[ExaminationAdmin] Failed to sync exam_type", error);
+        });
+    }
+
+    function attachHandlers() {
+      var packageEl = byIdOrName("id_exam_package", "exam_package");
+      if (!packageEl) return;
+
+      packageEl.addEventListener("change", syncExamTypeFromPackage);
+
+      if (window.django && django.jQuery) {
+        django.jQuery(packageEl).on("select2:select", syncExamTypeFromPackage);
+        django.jQuery(packageEl).on("select2:clear", function() {
+          setExamType("");
+        });
+      }
+    }
+
+    attachHandlers();
+  })();
+  </script>
+{% endblock %}

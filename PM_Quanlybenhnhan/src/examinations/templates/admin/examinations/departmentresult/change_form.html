@@ -1,0 +1,241 @@
+{% extends "admin/change_form.html" %}
+
+{% block after_field_sets %}
+  {{ block.super }}
+  <fieldset class="module aligned" id="dynamic-fields-section">
+    <h2>Kết quả khám</h2>
+    <div id="dynamic-fields-container">
+      {% if dynamic_fields %}
+        <table style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Chỉ số</th>
+              <th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Đơn vị</th>
+              <th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Giá trị</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for field in dynamic_fields %}
+              <tr>
+                <td style="padding:8px; border-bottom:1px solid #eee;">
+                  <strong>{{ field.label }}</strong>
+                  {% if field.normal_range %}
+                    <div style="color:#666; font-size:12px;">{{ field.normal_range }}</div>
+                  {% endif %}
+                </td>
+                <td style="padding:8px; border-bottom:1px solid #eee;">{{ field.unit }}</td>
+                <td style="padding:8px; border-bottom:1px solid #eee;">
+                  {% if field.type == "textarea" %}
+                    <textarea name="dr_field_{{ field.key }}" rows="3" style="width:100%;">{{ field.value|default_if_none:"" }}</textarea>
+                  {% elif field.type == "number" %}
+                    <input type="number" step="any" name="dr_field_{{ field.key }}" value="{{ field.value|default_if_none:'' }}" style="width:100%;" />
+                  {% elif field.type == "date" %}
+                    <input type="date" name="dr_field_{{ field.key }}" value="{{ field.value|default_if_none:'' }}" style="width:100%;" />
+                  {% elif field.type == "boolean" %}
+                    <input type="checkbox" name="dr_field_{{ field.key }}" {% if field.value %}checked{% endif %} />
+                  {% elif field.type == "select" %}
+                    <select name="dr_field_{{ field.key }}" style="width:100%;">
+                      <option value="">---</option>
+                      {% for option in field.options %}
+                        <option value="{{ option }}" {% if field.value == option %}selected{% endif %}>{{ option }}</option>
+                      {% endfor %}
+                    </select>
+                  {% elif field.type == "multi_select" %}
+                    {% for option in field.options %}
+                      <label style="display:block;">
+                        <input type="checkbox" name="dr_field_{{ field.key }}" value="{{ option }}" {% if field.value and option in field.value %}checked{% endif %} />
+                        {{ option }}
+                      </label>
+                    {% endfor %}
+                  {% else %}
+                    <input type="text" name="dr_field_{{ field.key }}" value="{{ field.value|default_if_none:'' }}" style="width:100%;" />
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        {% if not original %}
+          <p style="padding:8px; color:#666;">Chọn <strong>Examination</strong> và <strong>Department</strong> ở trên, sau đó bấm nút bên dưới để tải mẫu nhập liệu.</p>
+        {% endif %}
+      {% endif %}
+    </div>
+    {% if not original %}
+      <div style="padding:8px;">
+        <button type="button" id="btn-load-fields" class="button" style="padding:8px 16px; cursor:pointer;">Tải mẫu nhập liệu</button>
+        <span id="load-status" style="margin-left:8px; color:#666;"></span>
+      </div>
+    {% endif %}
+  </fieldset>
+{% endblock %}
+
+{% block admin_change_form_document_ready %}
+  {{ block.super }}
+  <script>
+  (function() {
+    "use strict";
+
+    console.log("[DepartmentResultAdmin] dynamic fields script loaded");
+
+    var previewUrl = "/admin/examinations/departmentresult/preview-fields/";
+    var button = document.getElementById("btn-load-fields");
+    var container = document.getElementById("dynamic-fields-container");
+    var statusEl = document.getElementById("load-status");
+
+    function byIdOrName(id, name) {
+      return document.getElementById(id) || document.querySelector('[name="' + name + '"]');
+    }
+
+    function getSelectedValue(name) {
+      var el = byIdOrName("id_" + name, name);
+      if (!el) return "";
+      return el.value || "";
+    }
+
+    function escapeHtml(value) {
+      if (value === null || value === undefined) return "";
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;");
+    }
+
+    function buildInput(field) {
+      var name = "dr_field_" + field.key;
+      var value = field.value === null || field.value === undefined ? "" : field.value;
+      var type = field.type || "text";
+
+      if (type === "textarea") {
+        return '<textarea name="' + name + '" rows="3" style="width:100%;">' + escapeHtml(value) + '</textarea>';
+      }
+      if (type === "number") {
+        return '<input type="number" step="any" name="' + name + '" value="' + escapeHtml(value) + '" style="width:100%;" />';
+      }
+      if (type === "date") {
+        return '<input type="date" name="' + name + '" value="' + escapeHtml(value) + '" style="width:100%;" />';
+      }
+      if (type === "boolean") {
+        return '<input type="checkbox" name="' + name + '" ' + (value ? "checked" : "") + ' />';
+      }
+      if (type === "select") {
+        var selectHtml = '<select name="' + name + '" style="width:100%;"><option value="">---</option>';
+        var options = field.options || [];
+        for (var i = 0; i < options.length; i++) {
+          var selected = value === options[i] ? " selected" : "";
+          selectHtml += '<option value="' + escapeHtml(options[i]) + '"' + selected + '>' + escapeHtml(options[i]) + '</option>';
+        }
+        return selectHtml + '</select>';
+      }
+      if (type === "multi_select") {
+        var multiHtml = "";
+        var selectedValues = Array.isArray(value) ? value : [];
+        var multiOptions = field.options || [];
+        for (var j = 0; j < multiOptions.length; j++) {
+          var checked = selectedValues.indexOf(multiOptions[j]) !== -1 ? " checked" : "";
+          multiHtml += '<label style="display:block;"><input type="checkbox" name="' + name + '" value="' + escapeHtml(multiOptions[j]) + '"' + checked + ' /> ' + escapeHtml(multiOptions[j]) + '</label>';
+        }
+        return multiHtml;
+      }
+      return '<input type="text" name="' + name + '" value="' + escapeHtml(value) + '" style="width:100%;" />';
+    }
+
+    function buildTable(fields) {
+      var html = '<table style="width:100%; border-collapse:collapse;">';
+      html += '<thead><tr>';
+      html += '<th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Chỉ số</th>';
+      html += '<th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Đơn vị</th>';
+      html += '<th style="text-align:left; padding:8px; border-bottom:1px solid #ddd;">Giá trị</th>';
+      html += '</tr></thead><tbody>';
+
+      for (var i = 0; i < fields.length; i++) {
+        var field = fields[i];
+        var label = escapeHtml(field.label || field.key);
+        if (field.normal_range) {
+          var min = field.normal_range.min !== undefined ? field.normal_range.min : "";
+          var max = field.normal_range.max !== undefined ? field.normal_range.max : "";
+          if (min !== "" || max !== "") {
+            label += ' <span style="color:#666; font-size:12px;">[' + escapeHtml(min) + "-" + escapeHtml(max) + "]</span>";
+          }
+        }
+        html += '<tr>';
+        html += '<td style="padding:8px; border-bottom:1px solid #eee;"><strong>' + label + '</strong></td>';
+        html += '<td style="padding:8px; border-bottom:1px solid #eee;">' + escapeHtml(field.unit || "") + '</td>';
+        html += '<td style="padding:8px; border-bottom:1px solid #eee;">' + buildInput(field) + '</td>';
+        html += '</tr>';
+      }
+
+      html += '</tbody></table>';
+      return html;
+    }
+
+    function setStatus(text, isError) {
+      if (!statusEl) return;
+      statusEl.textContent = text || "";
+      statusEl.style.color = isError ? "red" : "#666";
+    }
+
+    function loadFields() {
+      console.log("[DepartmentResultAdmin] loadFields clicked");
+
+      if (!container) {
+        console.error("[DepartmentResultAdmin] container not found");
+        return;
+      }
+
+      var examination = getSelectedValue("examination");
+      var department = getSelectedValue("department");
+      console.log("[DepartmentResultAdmin] selected", {examination: examination, department: department});
+
+      if (!examination || !department) {
+        container.innerHTML = '<p style="padding:8px; color:#666;">Vui lòng chọn cả Examination và Department.</p>';
+        setStatus("", false);
+        return;
+      }
+
+      if (button) button.disabled = true;
+      setStatus("Đang tải...", false);
+
+      var url = previewUrl + "?examination=" + encodeURIComponent(examination) + "&department=" + encodeURIComponent(department);
+      console.log("[DepartmentResultAdmin] fetch", url);
+
+      fetch(url, {headers: {"X-Requested-With": "XMLHttpRequest"}})
+        .then(function(response) {
+          console.log("[DepartmentResultAdmin] response", response.status);
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          return response.json();
+        })
+        .then(function(data) {
+          if (button) button.disabled = false;
+          setStatus("", false);
+
+          if (!data.fields || data.fields.length === 0) {
+            container.innerHTML = '<p style="padding:8px; color:#999;">Không tìm thấy mẫu cho khoa này trong gói khám.</p>';
+            return;
+          }
+
+          container.innerHTML = buildTable(data.fields);
+        })
+        .catch(function(error) {
+          if (button) button.disabled = false;
+          setStatus("Lỗi tải mẫu", true);
+          container.innerHTML = '<p style="padding:8px; color:red;">Lỗi tải mẫu: ' + escapeHtml(error.message || error) + '</p>';
+          console.error("[DepartmentResultAdmin] load error", error);
+        });
+    }
+
+    if (button) {
+      button.addEventListener("click", loadFields);
+      console.log("[DepartmentResultAdmin] button handler attached");
+    } else {
+      console.warn("[DepartmentResultAdmin] load button not found");
+    }
+
+    var examinationEl = byIdOrName("id_examination", "examination");
+    var departmentEl = byIdOrName("id_department", "department");
+    if (examinationEl) examinationEl.addEventListener("change", loadFields);
+    if (departmentEl) departmentEl.addEventListener("change", loadFields);
+  })();
+  </script>
+{% endblock %}

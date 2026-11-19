@@ -1,0 +1,284 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }} | {{ site_title|default:_("Django site admin") }}{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+  .tg { max-width: 1100px; }
+  .tg-lead { color: #444; margin: 0 0 16px; max-width: 72ch; }
+  .tg-toolbar {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    margin: 0 0 20px;
+  }
+  .tg-toolbar input[type="search"] {
+    min-width: 280px; padding: 6px 10px; font-size: 13px;
+  }
+  .tg-toc {
+    display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 24px;
+  }
+  .tg-toc a {
+    background: #fff; border: 1px solid #ccc; border-radius: 999px;
+    padding: 3px 10px; font-size: 12px; text-decoration: none;
+  }
+  .tg-toc a:hover { border-color: #417690; }
+  .tg-section { margin: 0 0 28px; }
+  .tg-section h2 {
+    border-bottom: 1px solid #ddd; padding-bottom: 6px; margin: 0 0 10px;
+  }
+  .tg-section p { max-width: 80ch; }
+  .tg-examples { margin: 8px 0 0; padding: 0; list-style: none; }
+  .tg-examples li { margin: 0 0 8px; }
+  .tg-examples code, .tg-token {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12px; background: #f4f4f4; padding: 2px 6px; border-radius: 3px;
+    white-space: pre-wrap;
+  }
+  .tg-note { color: #666; font-size: 12px; margin-left: 6px; }
+  .tg-table { width: 100%; border-collapse: collapse; background: #fff; }
+  .tg-table th, .tg-table td {
+    border: 1px solid #ddd; padding: 7px 8px; vertical-align: top;
+    font-size: 13px;
+  }
+  .tg-table th { background: #f8f8f8; text-align: left; }
+  .tg-scope {
+    display: inline-block; font-size: 11px; padding: 1px 7px;
+    border-radius: 999px; background: #e8eef2; color: #234;
+  }
+  .tg-scope.is-dept { background: #e8f3ea; color: #1b5e20; }
+  .tg-scope.is-report { background: #e7eef8; color: #1a365d; }
+  .tg-copy {
+    margin-left: 6px; font-size: 11px; padding: 1px 6px; cursor: pointer;
+    border: 1px solid #bbb; background: #fff; border-radius: 3px;
+  }
+  .tg-copy.is-done { border-color: #1b5e20; color: #1b5e20; }
+  .tg-params { color: #555; font-size: 12px; }
+  .tg-hidden { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tg" id="template-guide">
+  <p class="tg-lead">
+    Dùng các mã dưới đây trong <strong>template khoa</strong> hoặc
+    <strong>thân báo cáo HTML</strong>. Bấm <em>Chép</em> rồi dán vào ô soạn thảo.
+    File Excel đầu/chân trang không đọc các mã này.
+  </p>
+
+  <div class="tg-toolbar">
+    <input type="search" id="tg-search" placeholder="Tìm mã, tên hàm, biến…" autocomplete="off">
+    <span id="tg-count" class="tg-note"></span>
+  </div>
+
+  <nav class="tg-toc" aria-label="Mục lục">
+    {% for concept in concepts %}
+      <a href="#{{ concept.id }}">{{ concept.title }}</a>
+    {% endfor %}
+    <a href="#html-tags">Thẻ HTML</a>
+    <a href="#html-attributes">Thuộc tính HTML</a>
+    <a href="#html-notes">Giới hạn HTML → Excel</a>
+    <a href="#tags">Mã gọi hàm</a>
+    <a href="#variables">Biến</a>
+  </nav>
+
+  {% for concept in concepts %}
+  <section class="tg-section" id="{{ concept.id }}">
+    <h2>{{ concept.title }}</h2>
+    {% for paragraph in concept.paragraphs %}
+      <p>{{ paragraph }}</p>
+    {% endfor %}
+    {% if concept.examples %}
+    <ul class="tg-examples">
+      {% for example in concept.examples %}
+        <li>
+          <code>{{ example.code }}</code>
+          {% if example.note %}<span class="tg-note">{{ example.note }}</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <section class="tg-section" id="html-tags">
+    <h2>Thẻ HTML dùng trong template báo cáo</h2>
+    <p>
+      Các thẻ dưới đây hiển thị trong bản HTML/PDF và được bộ xuất Excel xử lý
+      ở mức độ ghi trong cột <em>Khi xuất Excel</em>.
+    </p>
+    <table class="tg-table">
+      <thead>
+        <tr>
+          <th>Thẻ</th>
+          <th>Công dụng</th>
+          <th>Thuộc tính thường dùng</th>
+          <th>Khi xuất Excel</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in html_tags %}
+        <tr class="tg-row" data-haystack="{{ item.tag|escape }} {{ item.purpose|escape }} {{ item.attributes|escape }} {{ item.excel|escape }}">
+          <td><code class="tg-token">{{ item.tag }}</code></td>
+          <td>{{ item.purpose }}</td>
+          <td><code>{{ item.attributes }}</code></td>
+          <td>{{ item.excel }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="tg-section" id="html-attributes">
+    <h2>Thuộc tính HTML được hỗ trợ</h2>
+    <p>
+      Trình duyệt hiểu CSS đầy đủ hơn Excel. Hãy xem riêng hai cột HTML và
+      Excel trước khi tùy chỉnh bố cục.
+    </p>
+    <table class="tg-table">
+      <thead>
+        <tr>
+          <th>Thuộc tính</th>
+          <th>Giá trị mẫu</th>
+          <th>Trong HTML/PDF</th>
+          <th>Trong Excel</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in html_attributes %}
+        <tr class="tg-row" data-haystack="{{ item.attribute|escape }} {{ item.values|escape }} {{ item.html|escape }} {{ item.excel|escape }}">
+          <td><code class="tg-token">{{ item.attribute }}</code></td>
+          <td><code>{{ item.values }}</code></td>
+          <td>{{ item.html }}</td>
+          <td>{{ item.excel }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="tg-section" id="html-notes">
+    <h2>Giới hạn khi chuyển HTML sang Excel</h2>
+    <ul>
+      {% for note in html_notes %}
+        <li>{{ note }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="tg-section" id="tags">
+    <h2>Mã gọi hàm</h2>
+    <p>Gọi trực tiếp, không cần <code>{% templatetag openblock %} load {% templatetag closeblock %}</code>. Hàm phạm vi <em>báo cáo</em> chỉ in một lần mỗi lần xuất file.</p>
+    <table class="tg-table">
+      <thead>
+        <tr>
+          <th>Mã</th>
+          <th>Ý nghĩa</th>
+          <th>Phạm vi</th>
+          <th>Tham số</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tag in tags %}
+        <tr class="tg-row" data-haystack="{{ tag.token|escape }} {{ tag.label|escape }} {{ tag.help|escape }}">
+          <td>
+            <code class="tg-token">{{ tag.token }}</code>
+            <button type="button" class="tg-copy" data-copy="{{ tag.token|escape }}">Chép</button>
+            {% if tag.example %}
+              <div class="tg-note">Ví dụ: <code>{{ tag.example }}</code></div>
+            {% endif %}
+          </td>
+          <td>{{ tag.help|default:tag.label }}</td>
+          <td>
+            {% if tag.scope == "department" %}
+              <span class="tg-scope is-dept">khoa</span>
+            {% else %}
+              <span class="tg-scope is-report">báo cáo</span>
+            {% endif %}
+          </td>
+          <td class="tg-params">
+            {% if tag.params %}
+              {% for param in tag.params %}
+                <div><code>{{ param.name }}</code> = {{ param.default }}{% if param.choices %} ({{ param.choices|join:", " }}){% endif %}</div>
+              {% endfor %}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="tg-section" id="variables">
+    <h2>Biến</h2>
+    {% for group in groups %}
+      {% if group.group != "Mã gọi hàm (template tags)" %}
+      <h3>{{ group.group }}</h3>
+      <table class="tg-table">
+        <thead>
+          <tr><th>Mã</th><th>Ý nghĩa</th></tr>
+        </thead>
+        <tbody>
+          {% for item in group.variables %}
+          <tr class="tg-row" data-haystack="{{ item.token|escape }} {{ item.label|escape }} {{ item.help|escape }}">
+            <td>
+              <code class="tg-token">{{ item.token }}</code>
+              <button type="button" class="tg-copy" data-copy="{{ item.token|escape }}">Chép</button>
+            </td>
+            <td>{{ item.help|default:item.label }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    {% endfor %}
+  </section>
+</div>
+
+<script>
+(function () {
+  var search = document.getElementById("tg-search");
+  var rows = Array.prototype.slice.call(document.querySelectorAll(".tg-row"));
+  var count = document.getElementById("tg-count");
+  function applyFilter() {
+    var q = (search.value || "").toLowerCase().trim();
+    var shown = 0;
+    rows.forEach(function (row) {
+      var hay = (row.getAttribute("data-haystack") || "").toLowerCase();
+      var ok = !q || hay.indexOf(q) !== -1;
+      row.classList.toggle("tg-hidden", !ok);
+      if (ok) shown += 1;
+    });
+    count.textContent = q ? ("Hiện " + shown + "/" + rows.length) : "";
+  }
+  search.addEventListener("input", applyFilter);
+
+  document.querySelectorAll(".tg-copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var text = btn.getAttribute("data-copy") || "";
+      function done() {
+        btn.textContent = "Đã chép";
+        btn.classList.add("is-done");
+        setTimeout(function () {
+          btn.textContent = "Chép";
+          btn.classList.remove("is-done");
+        }, 1200);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done);
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        done();
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,8 @@
+#- bỏ click vào hàng ở nhân viên
+#- sắp xếp
+#- chỉ hoàn thành khi tất cả các cột có value
+- lịch sử page (nút back) => để sau
+#- nhập liệu, nhập/xuất filter nhân viên deactivate
+#- tự động chọn ô đầu tiên trong bảng nhập liệu
+- tạo template header báo cáo chi tiết
+- design báo cáo tổng hợp
